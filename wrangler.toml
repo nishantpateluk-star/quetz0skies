@@ -1,0 +1,9 @@
+# Cloudflare configuration for the Quetzalcoatlus game.
+# A standalone static-assets Worker: no script, no bindings, and no link to any other Worker or Pages site.
+name = "quetzalcoatlus-skies"
+compatibility_date = "2026-09-01"
+
+[assets]
+directory = "./public"
+html_handling = "auto-trailing-slash"
+not_found_handling = "single-page-application"

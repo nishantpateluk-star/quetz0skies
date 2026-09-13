@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Quetzalcoatlus - Cretaceous Skies</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #a9d0f5; font-family: "Segoe UI", Arial, sans-serif; touch-action: none; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; }
+  #hud { position: absolute; left: 16px; top: 14px; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); pointer-events: none; }
+  #hud h1 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; letter-spacing: .5px; }
+  #hud .sub { font-size: 13px; opacity: .9; }
+  #controls { position: absolute; left: 16px; bottom: 14px; color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: rgba(0,0,0,.25); padding: 8px 12px; border-radius: 8px; line-height: 1.6; pointer-events: none; }
+  #controls b { display: inline-block; min-width: 42px; background: rgba(255,255,255,.18); border-radius: 4px; padding: 0 6px; text-align: center; margin-right: 6px; font-weight: 600; }
+  #stats { position: absolute; right: 16px; top: 14px; color: #fff; font-size: 14px; text-align: right; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: rgba(0,0,0,.25); padding: 8px 12px; border-radius: 8px; line-height: 1.6; pointer-events: none; }
+  #alert { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); color: #fff; font-size: 26px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.8), 0 0 18px rgba(255,80,40,.6); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+  #flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px rgba(210,40,25,0); transition: box-shadow .18s; }
+  #dpad { position: absolute; right: 26px; bottom: 26px; width: 176px; height: 176px; border-radius: 50%; display: none; touch-action: none;
+          background: radial-gradient(circle, rgba(255,255,255,.28) 0%, rgba(255,255,255,.14) 68%, rgba(255,255,255,0) 70%); box-shadow: 0 0 0 2px rgba(255,255,255,.25) inset; }
+  #dpad .arrow { position: absolute; width: 46px; height: 46px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 28px; opacity: .8; text-shadow: 0 1px 3px rgba(0,0,0,.7); transition: transform .1s, color .1s; pointer-events: none; }
+  #dpad .up { left: 65px; top: 4px; } #dpad .down { left: 65px; bottom: 4px; } #dpad .left { left: 4px; top: 65px; } #dpad .right { right: 4px; top: 65px; }
+  #dpad .arrow.on { opacity: 1; color: #ffe27a; transform: scale(1.25); }
+  #dpad .knob { position: absolute; width: 60px; height: 60px; border-radius: 50%; left: 58px; top: 58px; background: rgba(255,255,255,.6); box-shadow: 0 2px 10px rgba(0,0,0,.35); pointer-events: none; }
+  #touchhint { position: absolute; left: 16px; bottom: 14px; color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: rgba(0,0,0,.25); padding: 8px 12px; border-radius: 8px; display: none; pointer-events: none; }
+  body.touch #controls { display: none; } body.touch #dpad { display: block; } body.touch #touchhint { display: block; }
+  #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #3a2a1a; background: #f4e7cf; font-size: 18px; text-align: center; padding: 40px; }
+  #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; background: linear-gradient(#6fb0ee, #c9e3fb); text-shadow: 0 1px 4px rgba(0,0,0,.5); }
+</style>
+</head>
+<body>
+<div id="loading">Growing the Cretaceous&hellip;</div>
+<div id="err"></div>
+<div id="flash"></div>
+<div id="hud">
+  <h1>Quetzalcoatlus</h1>
+  <div class="sub">Cretaceous Skies &middot; open world</div>
+</div>
+<div id="controls">
+  <div><b>&larr; &rarr;</b> turn</div>
+  <div><b>&uarr;</b> climb (flap harder)</div>
+  <div><b>&darr;</b> dive (glide)</div>
+  <div style="opacity:.8;margin-top:4px">Stay high near the meat-eaters&hellip;</div>
+</div>
+<div id="touchhint">Drag the pad: up climbs, down dives, sides turn</div>
+<div id="stats">
+  <div>Altitude <span id="alt">0</span> m</div>
+  <div>Speed <span id="spd">0</span> km/h</div>
+  <div id="near" style="opacity:.85"></div>
+</div>
+<div id="alert"></div>
+<div id="dpad">
+  <div class="arrow up">&uarr;</div><div class="arrow down">&darr;</div><div class="arrow left">&larr;</div><div class="arrow right">&rarr;</div>
+  <div class="knob"></div>
+</div>
+
+<script src="three.min.js"></script>
+<script>
+(function () {
+  if (typeof THREE === 'undefined') {
+    const e = document.getElementById('err');
+    e.style.display = 'flex';
+    e.textContent = 'three.min.js was not found next to index.html. Keep both files in the same folder.';
+    document.getElementById('loading').style.display = 'none';
+    return;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Utilities
+  // ---------------------------------------------------------------------------
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const TAU = Math.PI * 2;
+  function smoothstep(e0, e1, x) { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
+  function approach(cur, target, maxDelta) { return cur + clamp(target - cur, -maxDelta, maxDelta); }
+  function angleLerp(a, b, t) { let d = ((b - a + Math.PI) % TAU + TAU) % TAU - Math.PI; return a + d * t; }
+  function damp(cur, target, lambda, dt) { return lerp(cur, target, 1 - Math.exp(-lambda * dt)); }
+
+  function hash(ix, iz) {
+    let n = (Math.imul(ix, 374761393) + Math.imul(iz, 668265263)) | 0;
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    n ^= n >>> 16;
+    return (n >>> 0) / 4294967296;
+  }
+  function vnoise(x, z) {
+    const ix = Math.floor(x), iz = Math.floor(z);
+    const fx = x - ix, fz = z - iz;
+    const ux = fx * fx * (3 - 2 * fx), uz = fz * fz * (3 - 2 * fz);
+    const a = hash(ix, iz), b = hash(ix + 1, iz), c = hash(ix, iz + 1), d = hash(ix + 1, iz + 1);
+    return (a * (1 - ux) + b * ux) * (1 - uz) + (c * (1 - ux) + d * ux) * uz;
+  }
+  function fbm(x, z, oct) {
+    let v = 0, a = 0.5, f = 1, s = 0;
+    for (let i = 0; i < oct; i++) { v += a * vnoise(x * f, z * f); s += a; a *= 0.5; f *= 2.03; }
+    return v / s;
+  }
+
+  // Phones / tablets report a coarse primary pointer. A touchscreen laptop with a mouse keeps keyboard controls
+  // until the player actually touches the screen.
+  const isTouch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const LOW = isTouch; // lighter settings for phones / tablets
+
+  // ---------------------------------------------------------------------------
+  // World definition
+  // ---------------------------------------------------------------------------
+  const HALF = 800;
+  const WATER_Y = 0;
+  const LAKES = [
+    { x: 120, z: -80, r: 95 }, { x: -380, z: 220, r: 75 }, { x: 350, z: 380, r: 65 },
+    { x: -250, z: -420, r: 85 }, { x: -40, z: 520, r: 60 }, { x: 520, z: -330, r: 70 },
+  ];
+  function terrainH(x, z) {
+    const n = fbm(x * 0.0035 + 7.3, z * 0.0035 + 2.1, 4);
+    let h = 2 + Math.pow(Math.max(0, n - 0.25), 1.4) * 55;
+    h += (fbm(x * 0.02 + 3.7, z * 0.02 + 9.1, 3) - 0.5) * 4;
+    h = Math.max(h, 0.8);
+    const d = Math.max(Math.abs(x), Math.abs(z)) / HALF;
+    if (d > 0.72) { const t = (d - 0.72) / 0.28; h += t * t * 150 * (0.7 + 0.6 * fbm(x * 0.01, z * 0.01, 3)); }
+    for (let i = 0; i < LAKES.length; i++) {
+      const L = LAKES[i];
+      const dist = Math.hypot(x - L.x, z - L.z);
+      if (dist < L.r * 1.5) {
+        h = lerp(h, 1.2, smoothstep(L.r * 1.5, L.r * 1.05, dist));
+        h = lerp(h, -6, smoothstep(L.r, L.r * 0.4, dist));
+      }
+    }
+    return h;
+  }
+  function nearestLakeDist(x, z) {
+    let best = 1e9;
+    for (const L of LAKES) { const d = Math.hypot(x - L.x, z - L.z) - L.r; if (d < best) best = d; }
+    return best;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Procedural textures (canvas)
+  // ---------------------------------------------------------------------------
+  function makeTex(size, draw, opts) {
+    const c = document.createElement('canvas'); c.width = c.height = size;
+    const ctx = c.getContext('2d'); draw(ctx, size);
+    const t = new THREE.CanvasTexture(c);
+    t.wrapS = t.wrapT = (opts && opts.clamp) ? THREE.ClampToEdgeWrapping : THREE.RepeatWrapping;
+    if (opts && opts.srgb) t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    return t;
+  }
+  // tiled brush strokes: draws at wrapped offsets so the texture tiles seamlessly
+  function tiledStroke(ctx, s, x, y, w, h, rot, style) {
+    ctx.fillStyle = style;
+    for (const ox of [-s, 0, s]) for (const oz of [-s, 0, s]) {
+      ctx.save(); ctx.translate(x + ox, y + oz); ctx.rotate(rot); ctx.fillRect(-w / 2, -h / 2, w, h); ctx.restore();
+    }
+  }
+  const grassTex = makeTex(512, (ctx, s) => {
+    ctx.fillStyle = '#c9cfb6'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 9000; i++) {
+      const g = rand(150, 235), r = g * rand(0.72, 0.9), b = g * rand(0.45, 0.7);
+      tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(1, 2.2), rand(6, 18), rand(-0.5, 0.5), `rgba(${r | 0},${g | 0},${b | 0},${rand(0.25, 0.6)})`);
+    }
+    for (let i = 0; i < 1800; i++) tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(1, 3), rand(1, 3), 0, `rgba(80,70,40,${rand(0.1, 0.35)})`);
+  }, { srgb: true });
+  const barkTex = makeTex(256, (ctx, s) => {
+    ctx.fillStyle = '#6a4a30'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 1400; i++) { const v = rand(45, 130); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(2, 6), rand(20, 90), rand(-0.08, 0.08), `rgba(${v | 0},${(v * 0.72) | 0},${(v * 0.5) | 0},${rand(0.3, 0.7)})`); }
+  }, { srgb: true });
+  const leafTex = makeTex(256, (ctx, s) => {
+    ctx.fillStyle = '#c4ccb0'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 2600; i++) { const g = rand(120, 240); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(4, 11), rand(3, 7), rand(0, Math.PI), `rgba(${(g * 0.75) | 0},${g | 0},${(g * 0.55) | 0},${rand(0.35, 0.8)})`); }
+  }, { srgb: true });
+  const rockTex = makeTex(256, (ctx, s) => {
+    ctx.fillStyle = '#bcb8b2'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 3000; i++) { const v = rand(110, 230); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(2, 9), rand(2, 9), rand(0, Math.PI), `rgba(${v | 0},${(v * 0.97) | 0},${(v * 0.94) | 0},${rand(0.25, 0.6)})`); }
+  }, { srgb: true });
+  const sandTex = grassTex;
+  // periodic height field -> tileable normal map (water ripples)
+  function makeNormalTex(size, comps, strength) {
+    return makeTex(size, (ctx, s) => {
+      const img = ctx.createImageData(s, s), d = img.data;
+      const H = (x, y) => { let v = 0; for (const c of comps) v += c[2] * Math.sin(TAU * (c[0] * x / s + c[1] * y / s) + (c[3] || 0)); return v; };
+      for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+        const dx = (H(x + 1, y) - H(x - 1, y)) * strength, dy = (H(x, y + 1) - H(x, y - 1)) * strength;
+        const nx = -dx, ny = -dy, nz = 1, len = Math.hypot(nx, ny, nz);
+        const i = (y * s + x) * 4;
+        d[i] = (nx / len * 0.5 + 0.5) * 255; d[i + 1] = (ny / len * 0.5 + 0.5) * 255; d[i + 2] = (nz / len * 0.5 + 0.5) * 255; d[i + 3] = 255;
+      }
+      ctx.putImageData(img, 0, 0);
+    });
+  }
+  const waterNormal = makeNormalTex(256, [[3, 5, 1], [-7, 4, 0.6], [11, -6, 0.35], [5, 13, 0.3], [-17, 9, 0.18], [23, 19, 0.12]], 0.9);
+  const skinBump = makeTex(256, (ctx, s) => {
+    ctx.fillStyle = '#808080'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 2600; i++) { const v = rand(70, 190); const r = rand(3, 9); ctx.fillStyle = `rgba(${v},${v},${v},0.7)`; for (const ox of [-s, 0, s]) for (const oz of [-s, 0, s]) { ctx.beginPath(); ctx.ellipse(rand(0, s) + ox, rand(0, s) + oz, r, r * 0.7, rand(0, Math.PI), 0, TAU); ctx.fill(); } }
+  });
+  const cloudTex = makeTex(256, (ctx, s) => {
+    ctx.clearRect(0, 0, s, s);
+    for (let i = 0; i < 16; i++) {
+      const x = s / 2 + rand(-s * 0.28, s * 0.28), y = s / 2 + rand(-s * 0.1, s * 0.16), r = rand(s * 0.12, s * 0.27);
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.6, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+    }
+  }, { clamp: true, srgb: true });
+
+  // ---------------------------------------------------------------------------
+  // Renderer / scene
+  // ---------------------------------------------------------------------------
+  const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, LOW ? 1.5 : 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.08;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  const HORIZON = new THREE.Color(0xd3e2f1);
+  scene.fog = new THREE.Fog(HORIZON, 320, 1500);
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 4000);
+  const SUN_DIR = new THREE.Vector3(0.55, 0.72, 0.42).normalize();
+
+  // Sky: analytic gradient + sun disc & glow, drawn in a shader
+  const skyMat = new THREE.ShaderMaterial({
+    uniforms: { sunDir: { value: SUN_DIR }, zenith: { value: new THREE.Color(0x2a66c8) }, mid: { value: new THREE.Color(0x7fb2ea) }, horizon: { value: HORIZON }, sunColor: { value: new THREE.Color(0xfff3d0) } },
+    vertexShader: `varying vec3 vDir; void main(){ vDir = (modelMatrix * vec4(position,1.0)).xyz - cameraPosition; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 sunDir, zenith, mid, horizon, sunColor; varying vec3 vDir;
+      void main(){ vec3 d = normalize(vDir); float h = d.y;
+        vec3 col = h > 0.0 ? mix(mid, zenith, pow(min(h * 1.6, 1.0), 0.8)) : horizon;
+        col = mix(horizon, col, smoothstep(-0.02, 0.22, h));
+        float s = max(dot(d, sunDir), 0.0);
+        col += sunColor * (pow(s, 2200.0) * 2.2 + pow(s, 90.0) * 0.55 + pow(s, 5.0) * 0.16);
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <colorspace_fragment>
+      }`,
+    side: THREE.BackSide, depthWrite: false, fog: false,
+  });
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 32, 16), skyMat);
+  sky.renderOrder = -10;
+  scene.add(sky);
+
+  // Lights
+  const hemi = new THREE.HemisphereLight(0xbcd6ff, 0x5f7040, 1.0);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight(0xfff1dc, 3.0);
+  sun.castShadow = true;
+  const SHADOW = LOW ? 1024 : 2048;
+  sun.shadow.mapSize.set(SHADOW, SHADOW);
+  sun.shadow.camera.near = 10; sun.shadow.camera.far = 500;
+  sun.shadow.camera.left = -140; sun.shadow.camera.right = 140; sun.shadow.camera.top = 140; sun.shadow.camera.bottom = -140;
+  sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.06;
+  scene.add(sun); scene.add(sun.target);
+
+  // ---------------------------------------------------------------------------
+  // Terrain
+  // ---------------------------------------------------------------------------
+  (function makeTerrain() {
+    const SEG = LOW ? 180 : 240;
+    const geo = new THREE.PlaneGeometry(HALF * 2, HALF * 2, SEG, SEG);
+    geo.rotateX(-Math.PI / 2);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    const sand = [0.80, 0.72, 0.52], dirt = [0.50, 0.42, 0.30], rock = [0.50, 0.47, 0.44], snow = [0.96, 0.97, 0.99];
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), z = pos.getZ(i);
+      const h = terrainH(x, z);
+      pos.setY(i, h);
+      const n = fbm(x * 0.05, z * 0.05, 2), n2 = fbm(x * 0.012 + 40, z * 0.012 + 17, 3);
+      let r = 0.36 + 0.14 * n + 0.08 * n2, g = 0.50 + 0.16 * n, b = 0.20 + 0.07 * n;
+      const dirtT = smoothstep(0.58, 0.72, n2) * 0.8;
+      r = lerp(r, dirt[0] + 0.05 * n, dirtT); g = lerp(g, dirt[1] + 0.05 * n, dirtT); b = lerp(b, dirt[2], dirtT);
+      if (h < 3.4) { const t = clamp((h - 1.6) / 1.8, 0, 1); r = lerp(sand[0] + 0.05 * n, r, t); g = lerp(sand[1] + 0.05 * n, g, t); b = lerp(sand[2], b, t); }
+      const sx = terrainH(x + 3, z) - terrainH(x - 3, z), sz = terrainH(x, z + 3) - terrainH(x, z - 3);
+      const slope = Math.hypot(sx, sz) / 6;
+      const rockT = Math.max(clamp((h - 38) / 22, 0, 1), clamp((slope - 0.7) / 0.5, 0, 1));
+      r = lerp(r, rock[0] + 0.1 * n, rockT); g = lerp(g, rock[1] + 0.1 * n, rockT); b = lerp(b, rock[2] + 0.08 * n, rockT);
+      const snowT = clamp((h - 95) / 30, 0, 1) * (1 - clamp((slope - 1.6) / 0.8, 0, 1));
+      r = lerp(r, snow[0], snowT); g = lerp(g, snow[1], snowT); b = lerp(b, snow[2], snowT);
+      colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b;
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.computeVertexNormals();
+    grassTex.repeat.set(110, 110);
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: grassTex, roughness: 1.0, metalness: 0.0 });
+    const terrain = new THREE.Mesh(geo, mat);
+    terrain.receiveShadow = true;
+    scene.add(terrain);
+  })();
+
+  // Lakes: rippling normal-mapped water
+  waterNormal.repeat.set(7, 7);
+  const waterMat = new THREE.MeshPhongMaterial({ color: 0x1f6592, specular: 0xffffff, shininess: 180, transparent: true, opacity: 0.86, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), reflectivity: 0.6 });
+  for (const L of LAKES) {
+    const geo = new THREE.CircleGeometry(L.r, 72);
+    geo.rotateX(-Math.PI / 2);
+    const w = new THREE.Mesh(geo, waterMat);
+    w.position.set(L.x, WATER_Y, L.z);
+    w.receiveShadow = true;
+    scene.add(w);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Generic geometry merge (keeps position / normal / uv / color when present)
+  // ---------------------------------------------------------------------------
+  function merge(geos) {
+    geos = geos.map(g => g.index ? g.toNonIndexed() : g);
+    const names = ['position', 'normal', 'uv', 'color'].filter(nm => geos.every(g => g.attributes[nm]));
+    const out = new THREE.BufferGeometry();
+    for (const nm of names) {
+      const item = geos[0].attributes[nm].itemSize;
+      let n = 0; for (const g of geos) n += g.attributes[nm].count;
+      const arr = new Float32Array(n * item); let o = 0;
+      for (const g of geos) { arr.set(g.attributes[nm].array, o); o += g.attributes[nm].array.length; }
+      out.setAttribute(nm, new THREE.BufferAttribute(arr, item));
+    }
+    return out;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Vegetation & rocks (instanced, textured)
+  // ---------------------------------------------------------------------------
+  const _m = new THREE.Matrix4(), _p = new THREE.Vector3(), _q = new THREE.Quaternion(), _s = new THREE.Vector3(), _c = new THREE.Color();
+  function landSpot(minH, maxH, extent, tries, extra) {
+    for (let i = 0; i < (tries || 40); i++) {
+      const x = rand(-extent, extent), z = rand(-extent, extent);
+      const h = terrainH(x, z);
+      if (h >= minH && h <= maxH && (!extra || extra(x, z, h))) return { x, z, h };
+    }
+    return null;
+  }
+  (function makeForests() {
+    const K = LOW ? 0.6 : 1;
+    const N_CONE = Math.round(900 * K), N_ROUND = Math.round(420 * K), N_BUSH = Math.round(520 * K), N_ROCK = 150;
+    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.45, 1, 7); trunkGeo.translate(0, 0.5, 0);
+    // conifer: three stacked tiers
+    const tier = (r, h, y) => { const g = new THREE.ConeGeometry(r, h, 9); g.translate(0, y + h / 2, 0); return g; };
+    const coneGeo = merge([tier(1.0, 0.5, 0), tier(0.8, 0.45, 0.3), tier(0.55, 0.4, 0.6)]);
+    // broadleaf: lumpy cluster of spheres
+    const lump = (r, x, y, z) => { const g = new THREE.SphereGeometry(r, 10, 8); g.translate(x, y, z); return g; };
+    const roundGeo = merge([lump(1, 0, 0, 0), lump(0.7, 0.6, 0.35, 0.2), lump(0.65, -0.55, 0.3, -0.3), lump(0.6, 0.1, 0.55, -0.5), lump(0.55, -0.2, -0.3, 0.6)]);
+    const bushGeo = merge([lump(1, 0, 0, 0), lump(0.7, 0.7, -0.1, 0.3), lump(0.6, -0.6, -0.1, -0.4)]);
+    const rockGeo = new THREE.DodecahedronGeometry(1, 1);
+
+    const trunkMat = new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.95 });
+    const leafMat = new THREE.MeshStandardMaterial({ map: leafTex, roughness: 0.9 });
+    const rockMat = new THREE.MeshStandardMaterial({ map: rockTex, roughness: 0.95 });
+    const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, N_CONE + N_ROUND);
+    const cones = new THREE.InstancedMesh(coneGeo, leafMat, N_CONE);
+    const rounds = new THREE.InstancedMesh(roundGeo, leafMat, N_ROUND);
+    const bushes = new THREE.InstancedMesh(bushGeo, leafMat, N_BUSH);
+    const rocks = new THREE.InstancedMesh(rockGeo, rockMat, N_ROCK);
+    for (const im of [trunks, cones, rounds, bushes, rocks]) { im.castShadow = true; im.receiveShadow = true; }
+
+    const forestOK = (x, z) => fbm(x * 0.008 + 11, z * 0.008 + 5, 2) > 0.47 && nearestLakeDist(x, z) > 8;
+    let ti = 0;
+    for (let i = 0; i < N_CONE; i++) {
+      const s = landSpot(2.6, 60, HALF * 0.74, 60, forestOK) || { x: rand(-500, 500), z: rand(-500, 500), h: 5 };
+      const height = rand(8, 17), trunkH = height * 0.25, canopyR = height * 0.24;
+      _q.setFromAxisAngle(_p.set(0, 1, 0), rand(0, TAU));
+      _m.compose(_p.set(s.x, s.h - 0.3, s.z), _q, _s.set(1.1, trunkH + 0.6, 1.1)); trunks.setMatrixAt(ti++, _m);
+      _m.compose(_p.set(s.x, s.h + trunkH * 0.7, s.z), _q, _s.set(canopyR, height - trunkH * 0.7, canopyR)); cones.setMatrixAt(i, _m);
+      _c.setHSL(0.30 + rand(-0.04, 0.03), rand(0.30, 0.45), rand(0.26, 0.36)); cones.setColorAt(i, _c);
+    }
+    for (let i = 0; i < N_ROUND; i++) {
+      const s = landSpot(2.6, 40, HALF * 0.74, 60, (x, z) => nearestLakeDist(x, z) > 6) || { x: rand(-500, 500), z: rand(-500, 500), h: 5 };
+      const height = rand(6, 14), trunkH = height * 0.45, canopyR = height * 0.36;
+      _q.setFromAxisAngle(_p.set(0, 1, 0), rand(0, TAU));
+      _m.compose(_p.set(s.x, s.h - 0.3, s.z), _q, _s.set(1.4, trunkH + 0.6, 1.4)); trunks.setMatrixAt(ti++, _m);
+      _m.compose(_p.set(s.x, s.h + trunkH + canopyR * 0.55, s.z), _q, _s.set(canopyR, canopyR * 0.85, canopyR)); rounds.setMatrixAt(i, _m);
+      _c.setHSL(0.24 + rand(-0.05, 0.07), rand(0.35, 0.55), rand(0.30, 0.42)); rounds.setColorAt(i, _c);
+    }
+    for (let i = 0; i < N_BUSH; i++) {
+      const s = landSpot(1.4, 45, HALF * 0.74, 30) || { x: rand(-500, 500), z: rand(-500, 500), h: 5 };
+      const r = rand(0.8, 2.4);
+      _q.setFromAxisAngle(_p.set(0, 1, 0), rand(0, TAU));
+      _m.compose(_p.set(s.x, s.h + r * 0.15, s.z), _q, _s.set(r, r * 0.6, r)); bushes.setMatrixAt(i, _m);
+      _c.setHSL(0.26 + rand(-0.04, 0.07), rand(0.35, 0.55), rand(0.28, 0.4)); bushes.setColorAt(i, _c);
+    }
+    for (let i = 0; i < N_ROCK; i++) {
+      const s = landSpot(1.0, 130, HALF * 0.9, 30) || { x: rand(-500, 500), z: rand(-500, 500), h: 5 };
+      const r = rand(1, 4.5);
+      _q.setFromEuler(new THREE.Euler(rand(0, TAU), rand(0, TAU), rand(0, TAU)));
+      _m.compose(_p.set(s.x, s.h + r * 0.2, s.z), _q, _s.set(r, r * 0.7, r)); rocks.setMatrixAt(i, _m);
+      _c.setHSL(0.08, rand(0.04, 0.1), rand(0.4, 0.55)); rocks.setColorAt(i, _c);
+    }
+    for (const im of [trunks, cones, rounds, bushes, rocks]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; scene.add(im); }
+  })();
+
+  // Clouds: soft sprite clusters
+  const clouds = [];
+  (function makeClouds() {
+    const mat = new THREE.SpriteMaterial({ map: cloudTex, transparent: true, depthWrite: false, opacity: 0.92 });
+    for (let i = 0; i < 28; i++) {
+      const g = new THREE.Group();
+      const puffs = 4 + Math.floor(Math.random() * 5);
+      for (let j = 0; j < puffs; j++) {
+        const sp = new THREE.Sprite(mat);
+        const w = rand(55, 120);
+        sp.position.set(rand(-60, 60), rand(-8, 10), rand(-25, 25));
+        sp.scale.set(w, w * rand(0.45, 0.65), 1);
+        g.add(sp);
+      }
+      g.position.set(rand(-HALF * 1.3, HALF * 1.3), rand(150, 240), rand(-HALF * 1.3, HALF * 1.3));
+      g.userData.speed = rand(1.5, 4);
+      scene.add(g);
+      clouds.push(g);
+    }
+  })();
+
+  // ---------------------------------------------------------------------------
+  // Creature construction
+  // ---------------------------------------------------------------------------
+  skinBump.repeat.set(3, 3);
+  const skinMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.0, bumpMap: skinBump, bumpScale: 0.035 });
+  const skinMat2 = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.0, side: THREE.DoubleSide, bumpMap: skinBump, bumpScale: 0.02 });
+
+  function ell(rx, ry, rz, seg) { const s = seg || 12; const g = new THREE.SphereGeometry(1, s, Math.max(6, Math.round(s * 0.75))); g.scale(rx, ry, rz); return g; }
+  function frustum(rF, rB, len, radial) { const g = new THREE.CylinderGeometry(rF, rB, len, radial || 10); g.rotateX(Math.PI / 2); return g; }
+  function tbox(wF, hF, wB, hB, len) {
+    const g = new THREE.BoxGeometry(1, 1, len);
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const f = p.getZ(i) > 0; p.setX(i, p.getX(i) * (f ? wF : wB)); p.setY(i, p.getY(i) * (f ? hF : hB)); }
+    g.computeVertexNormals();
+    return g;
+  }
+  function coneZ(r, len, seg) { const g = new THREE.ConeGeometry(r, len, seg || 6); g.rotateX(Math.PI / 2); g.translate(0, 0, len / 2); return g; }
+  function place(g, x, y, z, rx, ry, rz) {
+    if (rx || ry || rz) g.applyMatrix4(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rx || 0, ry || 0, rz || 0)));
+    g.translate(x || 0, y || 0, z || 0);
+    return g;
+  }
+  function withOff(pal, oy, oz) { return Object.assign({}, pal, { oy: oy || 0, oz: oz || 0 }); }
+  const _col = new THREE.Color(), _top = new THREE.Color(), _bel = new THREE.Color(), _acc = new THREE.Color();
+  function paint(g, pal, flat) {
+    if (g.index) g = g.toNonIndexed();
+    const p = g.attributes.position, n = p.count, col = new Float32Array(n * 3);
+    _top.set(pal.top); _bel.set(pal.belly); _acc.set(pal.accent != null ? pal.accent : pal.top);
+    const oy = pal.oy || 0, oz = pal.oz || 0, f = pal.f || 0.5;
+    for (let i = 0; i < n; i++) {
+      if (flat != null) { _col.set(flat); }
+      else {
+        const x = p.getX(i), y = p.getY(i) + oy, z = p.getZ(i) + oz;
+        const t = smoothstep(pal.yBelly, pal.yTop, y);
+        _col.copy(_bel).lerp(_top, t);
+        const nz = fbm(x * f + z * f * 0.6 + 31.7, z * f - y * f * 0.8 + 12.3, 2);
+        if (pal.spots && nz > 0.58) _col.lerp(_acc, clamp((nz - 0.58) / 0.14, 0, 1) * pal.spots * (0.4 + 0.6 * t));
+        if (pal.stripes) { const s = 0.5 + 0.5 * Math.sin(z * pal.stripes + nz * 2.5); if (s > 0.72) _col.lerp(_acc, (s - 0.72) / 0.28 * 0.75 * t); }
+        _col.multiplyScalar(0.82 + 0.4 * nz);
+      }
+      col[i * 3] = _col.r; col[i * 3 + 1] = _col.g; col[i * 3 + 2] = _col.b;
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    return g;
+  }
+  function skinMesh(parts, pal, material) {
+    const geos = parts.map(p => Array.isArray(p) ? paint(p[0], pal, p[1]) : paint(p, pal));
+    const m = new THREE.Mesh(merge(geos), material || skinMat);
+    m.castShadow = true;
+    return m;
+  }
+  function eyePair(dx, y, z, r, iris) {
+    const out = [];
+    for (const s of [1, -1]) {
+      out.push([place(ell(r, r, r, 8), s * dx, y, z), iris || 0xd9a441]);
+      out.push([place(ell(r * 0.5, r * 0.5, r * 0.5, 6), s * dx * 1.12, y, z + r * 0.75), 0x0b0b0b]);
+    }
+    return out;
+  }
+  function chain(parent, x, y, z, segs, pal, backward) {
+    const pivots = [];
+    let cur = new THREE.Group(); cur.position.set(x, y, z); parent.add(cur);
+    const dir = backward ? -1 : 1;
+    for (const s of segs) {
+      cur.rotation.x = s.bend || 0; cur.userData.rest = s.bend || 0;
+      const g = backward ? frustum(s.r0, s.r1, s.len, 10) : frustum(s.r1, s.r0, s.len, 10);
+      if (s.sx || s.sy) g.scale(s.sx || 1, s.sy || 1, 1);
+      g.translate(0, 0, dir * s.len / 2);
+      const joint = ell(s.r0 * 1.03 * (s.sx || 1), s.r0 * 1.03 * (s.sy || 1), s.r0 * 1.03, 10);
+      cur.add(skinMesh([g, joint], withOff(pal, y)));
+      pivots.push(cur);
+      const next = new THREE.Group(); next.position.set(0, 0, dir * s.len); cur.add(next); cur = next;
+    }
+    return { pivots, end: cur };
+  }
+  function makeLeg(parent, x, z, thigh, shin, r, footLen, pal, opts) {
+    opts = opts || {};
+    const kneeRest = opts.kneeRest != null ? opts.kneeRest : 0.28;
+    const footH = r * 0.75;
+    const hipY = thigh + shin * Math.cos(kneeRest) + footH;
+    const hip = new THREE.Group(); hip.position.set(x, hipY, z + shin * Math.sin(kneeRest) * 0.5); parent.add(hip);
+    hip.add(skinMesh([place(new THREE.CylinderGeometry(r * 0.72, r, thigh, 10), 0, -thigh / 2, 0), ell(r * 1.2, r * 1.15, r * 1.35, 10)], withOff(pal, hipY)));
+    const knee = new THREE.Group(); knee.position.set(0, -thigh, 0); hip.add(knee);
+    knee.rotation.x = kneeRest;
+    knee.add(skinMesh([place(new THREE.CylinderGeometry(r * 0.72, r * 0.5, shin, 10), 0, -shin / 2, 0), ell(r * 0.78, r * 0.78, r * 0.85, 10)], withOff(pal, hipY - thigh)));
+    const ankle = new THREE.Group(); ankle.position.set(0, -shin, 0); knee.add(ankle);
+    ankle.rotation.x = -kneeRest;
+    const foot = [place(tbox(r * 1.7, footH * 0.7, r * 1.15, footH, footLen), 0, -footH / 2, footLen * 0.32), place(ell(r * 0.6, r * 0.55, r * 0.6, 8), 0, -footH * 0.4, 0)];
+    if (opts.claws) for (const dx of [-0.55, 0, 0.55]) foot.push([place(coneZ(r * 0.2, r * 0.85, 6), dx * r * 1.25, -footH * 0.7, footLen * 0.8), 0x2a2420]);
+    if (opts.hooves) for (const dx of [-0.5, 0.5]) foot.push([place(tbox(r * 0.55, footH * 0.5, r * 0.6, footH * 0.6, r * 0.5), dx * r * 0.9, -footH * 0.72, footLen * 0.8), 0x3a322a]);
+    ankle.add(skinMesh(foot, withOff(pal, 0)));
+    return { hip, knee, ankle, kneeRest };
+  }
+  function makeArm(parent, x, y, z, upper, lower, r, pal, claws) {
+    const a = new THREE.Group(); a.position.set(x, y, z); a.rotation.x = -0.35; parent.add(a);
+    const parts = [place(new THREE.CylinderGeometry(r * 0.8, r, upper, 8), 0, -upper / 2, 0), ell(r * 1.1, r * 1.1, r * 1.1, 8)];
+    parts.push(place(new THREE.CylinderGeometry(r * 0.7, r * 0.6, lower, 8), 0, -upper - lower * 0.45, lower * 0.35, -0.7));
+    if (claws) for (const dx of [-0.5, 0.5]) parts.push([place(coneZ(r * 0.35, r * 1.6, 5), dx * r, -upper - lower * 0.85, lower * 0.65), 0x2a2420]);
+    a.add(skinMesh(parts, withOff(pal, y)));
+    return a;
+  }
+  function teethRow(count, dx, y, z0, dz, len, down) {
+    const out = [];
+    for (let i = 0; i < count; i++) for (const s of [1, -1]) {
+      const g = new THREE.ConeGeometry(len * 0.22, len, 5);
+      if (down) g.rotateX(Math.PI);
+      out.push([place(g, s * dx * (1 - i * 0.05), y, z0 + i * dz), 0xf0e8d6]);
+    }
+    return out;
+  }
+
+  // ------------------------------- Dinosaurs ---------------------------------
+  function buildTRex() {
+    const pal = { top: 0x6e5a3a, belly: 0xcdb78c, accent: 0x33291a, yBelly: 3.9, yTop: 6.6, f: 0.55, spots: 0.5 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    body.add(skinMesh([place(ell(1.4, 1.6, 2.7, 14), 0, 5.45, 0.5), place(ell(1.3, 1.4, 1.8, 12), 0, 5.35, -1.5), place(ell(1.1, 1.0, 1.4, 10), 0, 6.2, 2.3)], pal));
+    const neck = chain(body, 0, 6.15, 2.7, [{ len: 1.25, r0: 0.9, r1: 0.74, bend: -0.8 }, { len: 1.25, r0: 0.74, r1: 0.62, bend: 0.62 }], pal, false);
+    const head = neck.end; head.rotation.x = 0.2; head.userData.rest = 0.2;
+    const hp = withOff(pal, 6.4);
+    head.add(skinMesh([
+      place(ell(0.95, 0.9, 1.15, 12), 0, 0.2, 0.45),
+      (() => { const s = frustum(0.55, 0.88, 2.6, 10); s.scale(1.25, 0.95, 1); return place(s, 0, 0.15, 1.95); })(),
+      place(ell(0.62, 0.42, 0.7, 10), 0, 0.28, 3.0),
+      place(ell(0.42, 0.3, 0.55, 8), 0.58, 0.78, 0.75), place(ell(0.42, 0.3, 0.55, 8), -0.58, 0.78, 0.75),
+      ...eyePair(0.72, 0.5, 0.95, 0.2),
+      ...teethRow(5, 0.5, -0.45, 1.05, 0.45, 0.42, true),
+    ], hp));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.3, 0.55); head.add(jaw);
+    jaw.add(skinMesh([(() => { const s = frustum(0.42, 0.7, 2.6, 8); s.scale(1.3, 0.7, 1); return place(s, 0, -0.25, 1.45); })(), ...teethRow(4, 0.4, 0.02, 0.9, 0.5, 0.34, false)], hp));
+    const tail = chain(body, 0, 5.3, -3.1, [
+      { len: 1.9, r0: 1.2, r1: 0.95, bend: -0.05 }, { len: 1.9, r0: 0.95, r1: 0.7, bend: -0.04 }, { len: 1.9, r0: 0.7, r1: 0.5, bend: -0.03 },
+      { len: 2.0, r0: 0.5, r1: 0.3, bend: -0.02 }, { len: 2.2, r0: 0.3, r1: 0.1, bend: 0 }], pal, true);
+    const legs = [makeLeg(body, 1.2, -1.0, 2.4, 2.2, 0.66, 1.9, pal, { claws: true }), makeLeg(body, -1.2, -1.0, 2.4, 2.2, 0.66, 1.9, pal, { claws: true })];
+    makeArm(body, 1.25, 4.9, 2.2, 0.8, 0.7, 0.2, pal, true); makeArm(body, -1.25, 4.9, 2.2, 0.8, 0.7, 0.2, pal, true);
+    return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.5, stride: 0.75, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 0.95, headComp: 0.35, name: 'Tyrannosaurus rex',
+      carnivore: true, aggro: 62, threatH: 26, runSpeed: 9.5, lungeDist: 17, biteH: 22, rear: 0.5, hop: 1.4, headY: 7.2 };
+  }
+
+  function buildSpino() {
+    const pal = { top: 0x5c7170, belly: 0xc6c0a4, accent: 0x2c3a3b, yBelly: 3.0, yTop: 5.4, f: 0.5, spots: 0.35, stripes: 1.1 };
+    const sailPal = { top: 0xc4562b, belly: 0x8e3a1c, accent: 0x5a2312, yBelly: 5.4, yTop: 8.6, f: 0.7, spots: 0.6 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    body.add(skinMesh([place(ell(1.25, 1.4, 3.7, 14), 0, 4.4, 0), place(ell(1.1, 1.2, 1.6, 10), 0, 4.4, -2.9), place(ell(1.0, 1.0, 1.3, 10), 0, 4.8, 3.4)], pal));
+    const sail = new THREE.Shape();
+    sail.moveTo(-4.0, 0); sail.quadraticCurveTo(-2.8, 2.6, -0.6, 3.5); sail.quadraticCurveTo(1.6, 3.6, 4.0, 0);
+    const sailParts = [place(new THREE.ShapeGeometry(sail, 14), 0, 5.3, 0, 0, Math.PI / 2, 0)];
+    for (let i = -3.2; i <= 3.3; i += 0.92) { const sh = 3.3 * Math.max(0.15, 1 - (i / 3.9) * (i / 3.9)); sailParts.push(place(new THREE.CylinderGeometry(0.06, 0.13, sh, 6), 0, 5.3 + sh / 2, i)); }
+    body.add(skinMesh(sailParts, sailPal, skinMat2));
+    const neck = chain(body, 0, 5.0, 3.9, [{ len: 1.2, r0: 0.8, r1: 0.66, bend: -0.55 }, { len: 1.2, r0: 0.66, r1: 0.56, bend: 0.45 }], pal, false);
+    const head = neck.end; head.rotation.x = 0.1; head.userData.rest = 0.1;
+    const hp = withOff(pal, 4.6);
+    head.add(skinMesh([
+      place(ell(0.7, 0.68, 0.9, 12), 0, 0.15, 0.3),
+      place(tbox(0.55, 0.55, 0.95, 0.85, 3.5), 0, 0.1, 2.2),
+      place(ell(0.4, 0.34, 0.5, 8), 0, 0.2, 4.0),
+      place(ell(0.28, 0.45, 0.45, 8), 0, 0.85, 0.35),
+      ...eyePair(0.5, 0.42, 0.7, 0.15),
+      ...teethRow(7, 0.3, -0.42, 0.9, 0.45, 0.32, true),
+    ], hp));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.28, 0.4); head.add(jaw);
+    jaw.add(skinMesh([place(tbox(0.48, 0.32, 0.85, 0.5, 3.6), 0, -0.16, 2.0), ...teethRow(6, 0.25, 0.02, 0.9, 0.5, 0.26, false)], hp));
+    const tail = chain(body, 0, 4.4, -3.9, [
+      { len: 1.8, r0: 1.0, r1: 0.85, bend: -0.03 }, { len: 1.8, r0: 0.85, r1: 0.7, bend: -0.02, sx: 0.75, sy: 1.3 }, { len: 1.9, r0: 0.7, r1: 0.55, bend: -0.02, sx: 0.6, sy: 1.5 },
+      { len: 1.9, r0: 0.55, r1: 0.4, bend: 0, sx: 0.55, sy: 1.6 }, { len: 2.0, r0: 0.4, r1: 0.22, bend: 0, sx: 0.5, sy: 1.6 }, { len: 2.0, r0: 0.22, r1: 0.06, bend: 0, sx: 0.5, sy: 1.5 }], pal, true);
+    const legs = [makeLeg(body, 1.15, -0.9, 1.9, 1.75, 0.58, 1.7, pal, { claws: true }), makeLeg(body, -1.15, -0.9, 1.9, 1.75, 0.58, 1.7, pal, { claws: true })];
+    makeArm(body, 1.2, 3.9, 2.4, 1.2, 1.0, 0.24, pal, true); makeArm(body, -1.2, 3.9, 2.4, 1.2, 1.0, 0.24, pal, true);
+    return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.48, stride: 0.8, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 0.85, headComp: 0.3, name: 'Spinosaurus',
+      carnivore: true, aggro: 58, threatH: 24, runSpeed: 8.5, lungeDist: 17, biteH: 20, rear: 0.42, hop: 1.0, headY: 5.6 };
+  }
+
+  function buildRaptor() {
+    const pal = { top: 0x8a6538, belly: 0xe2d1a8, accent: 0x33220f, yBelly: 1.05, yTop: 1.75, f: 1.6, stripes: 2.6, spots: 0.2 };
+    const featherPal = { top: 0x2f5878, belly: 0x4d7a9c, accent: 0x1b3448, yBelly: 0, yTop: 3, f: 2.0, spots: 0.3 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    body.add(skinMesh([place(ell(0.42, 0.47, 0.95, 12), 0, 1.42, 0), place(ell(0.38, 0.4, 0.55, 10), 0, 1.4, -0.7), place(ell(0.3, 0.3, 0.4, 8), 0, 1.55, 0.85)], pal));
+    const neck = chain(body, 0, 1.68, 0.95, [{ len: 0.55, r0: 0.24, r1: 0.19, bend: -1.0 }, { len: 0.55, r0: 0.19, r1: 0.16, bend: 0.75 }], pal, false);
+    const head = neck.end; head.rotation.x = 0.28; head.userData.rest = 0.28;
+    const hp = withOff(pal, 1.55);
+    head.add(skinMesh([
+      place(ell(0.24, 0.24, 0.32, 10), 0, 0.05, 0.12),
+      place(tbox(0.22, 0.2, 0.36, 0.3, 0.85), 0, 0.02, 0.62),
+      ...eyePair(0.19, 0.12, 0.25, 0.06),
+      ...teethRow(4, 0.11, -0.1, 0.35, 0.14, 0.1, true),
+    ], hp));
+    head.add(skinMesh([place(tbox(0.06, 0.34, 0.03, 0.14, 0.55), 0, 0.3, -0.15, 0.5)], featherPal, skinMat2));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.1, 0.15); head.add(jaw);
+    jaw.add(skinMesh([place(tbox(0.18, 0.1, 0.3, 0.14, 0.8), 0, -0.05, 0.42)], hp));
+    const tail = chain(body, 0, 1.4, -0.95, [
+      { len: 0.7, r0: 0.28, r1: 0.2, bend: 0.05 }, { len: 0.7, r0: 0.2, r1: 0.13, bend: 0.02 }, { len: 0.75, r0: 0.13, r1: 0.08, bend: 0 }, { len: 0.8, r0: 0.08, r1: 0.03, bend: 0 }], pal, true);
+    const fan = new THREE.Shape(); fan.moveTo(0, 0); fan.lineTo(-0.28, -0.9); fan.quadraticCurveTo(0, -1.15, 0.28, -0.9); fan.closePath();
+    tail.pivots[3].add(skinMesh([place(new THREE.ShapeGeometry(fan, 6), 0, 0.02, -0.3, -Math.PI / 2, 0, 0)], featherPal, skinMat2));
+    const legs = [makeLeg(body, 0.3, -0.15, 0.78, 0.7, 0.16, 0.6, pal, { claws: true, kneeRest: 0.35 }), makeLeg(body, -0.3, -0.15, 0.78, 0.7, 0.16, 0.6, pal, { claws: true, kneeRest: 0.35 })];
+    for (const s of [1, -1]) {
+      const arm = makeArm(body, s * 0.4, 1.25, 0.6, 0.4, 0.42, 0.07, pal, true);
+      const f = new THREE.Shape(); f.moveTo(0, 0); f.lineTo(0.05, -0.75); f.quadraticCurveTo(0.35, -0.55, 0.42, -0.1); f.closePath();
+      arm.add(skinMesh([place(new THREE.ShapeGeometry(f, 4), s * 0.02, -0.15, -0.05, 0, s * Math.PI / 2, 0)], featherPal, skinMat2));
+    }
+    return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.85, stride: 2.4, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 1.0, headComp: 0.45, name: 'Velociraptor',
+      carnivore: true, aggro: 40, threatH: 14, runSpeed: 17, lungeDist: 9, biteH: 12, rear: 0.55, hop: 3.8, headY: 2.0 };
+  }
+
+  function buildBrachio() {
+    const pal = { top: 0x7a8760, belly: 0xc8c39e, accent: 0x4a5436, yBelly: 5.6, yTop: 9.4, f: 0.32, spots: 0.5 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    body.add(skinMesh([place(ell(2.15, 2.3, 4.3, 16), 0, 7.6, 0), place(ell(2.0, 2.25, 2.2, 12), 0, 8.0, 2.4), place(ell(1.8, 1.9, 2.0, 12), 0, 7.4, -3.2)], pal));
+    const neck = chain(body, 0, 8.9, 3.6, [
+      { len: 2.4, r0: 1.1, r1: 0.9, bend: -0.9 }, { len: 2.4, r0: 0.9, r1: 0.72, bend: -0.16 }, { len: 2.4, r0: 0.72, r1: 0.58, bend: -0.12 },
+      { len: 2.4, r0: 0.58, r1: 0.47, bend: -0.05 }, { len: 2.4, r0: 0.47, r1: 0.4, bend: 0.12 }], pal, false);
+    const head = neck.end; head.rotation.x = 1.15; head.userData.rest = 1.15;
+    const hp = withOff(pal, 7.5);
+    head.add(skinMesh([
+      place(ell(0.55, 0.55, 0.75, 10), 0, 0.05, 0.3),
+      place(tbox(0.7, 0.55, 0.95, 0.8, 1.5), 0, -0.05, 1.05),
+      place(ell(0.38, 0.4, 0.45, 8), 0, 0.5, 0.35),
+      ...eyePair(0.42, 0.25, 0.55, 0.11, 0x2a1f14),
+    ], hp));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.3, 0.3); head.add(jaw);
+    jaw.add(skinMesh([place(tbox(0.55, 0.28, 0.8, 0.35, 1.4), 0, -0.1, 0.75)], hp));
+    const tail = chain(body, 0, 7.4, -4.4, [
+      { len: 2.3, r0: 1.35, r1: 1.1, bend: 0.02 }, { len: 2.3, r0: 1.1, r1: 0.85, bend: 0.0 }, { len: 2.3, r0: 0.85, r1: 0.62, bend: -0.03 },
+      { len: 2.4, r0: 0.62, r1: 0.42, bend: -0.04 }, { len: 2.5, r0: 0.42, r1: 0.24, bend: -0.03 }, { len: 2.6, r0: 0.24, r1: 0.06, bend: 0 }], pal, true);
+    const legs = [
+      makeLeg(body, 1.7, 2.5, 3.1, 2.9, 0.75, 1.5, pal, { kneeRest: 0.08, hooves: true }), makeLeg(body, -1.7, 2.5, 3.1, 2.9, 0.75, 1.5, pal, { kneeRest: 0.08, hooves: true }),
+      makeLeg(body, 1.7, -2.6, 2.9, 2.7, 0.78, 1.5, pal, { kneeRest: 0.1, hooves: true }), makeLeg(body, -1.7, -2.6, 2.9, 2.7, 0.78, 1.5, pal, { kneeRest: 0.1, hooves: true })];
+    return { group: g, body, legs, legPhases: [0, Math.PI, Math.PI, 0], legAmp: 0.28, stride: 0.45, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 1.45, headComp: 0.9, name: 'Brachiosaurus' };
+  }
+
+  function buildTrike() {
+    const pal = { top: 0x7d6745, belly: 0xc4b28e, accent: 0x3e3020, yBelly: 1.9, yTop: 4.1, f: 0.6, stripes: 1.3, spots: 0.2 };
+    const frillPal = { top: 0x9a5236, belly: 0x7a4a34, accent: 0xd9b26a, yBelly: 0, yTop: 2.6, f: 1.0, spots: 0.7 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    body.add(skinMesh([place(ell(1.6, 1.5, 3.0, 14), 0, 3.05, 0), place(ell(1.5, 1.4, 1.6, 12), 0, 3.35, 1.5), place(ell(1.4, 1.3, 1.4, 10), 0, 3.0, -2.2)], pal));
+    const head = new THREE.Group(); head.position.set(0, 3.7, 2.9); head.rotation.x = 0.12; head.userData.rest = 0.12; body.add(head);
+    const hp = withOff(pal, 3.5);
+    head.add(skinMesh([
+      place(tbox(1.5, 1.35, 2.1, 1.75, 2.4), 0, -0.25, 1.2),
+      place(ell(0.6, 0.5, 0.7, 8), 0, -0.2, 2.5),
+      ...eyePair(0.98, 0.05, 1.35, 0.14, 0x2a1f14),
+      [place(tbox(0.45, 0.5, 0.95, 0.85, 0.9), 0, -0.55, 2.95), 0xd6c6a0],
+      [place(coneZ(0.17, 2.0, 8), 0.72, 0.65, 1.7, -0.3, 0, 0), 0xe8dfc8], [place(coneZ(0.17, 2.0, 8), -0.72, 0.65, 1.7, -0.3, 0, 0), 0xe8dfc8],
+      [place(coneZ(0.16, 0.85, 8), 0, 0.3, 2.65, -0.5, 0, 0), 0xe8dfc8],
+    ], hp));
+    const frill = new THREE.Shape();
+    const pts = 22; frill.moveTo(-1.9, -0.3);
+    for (let i = 0; i <= pts; i++) { const a = Math.PI - (i / pts) * Math.PI; const r = 1 + 0.06 * Math.sin(i * 2.4); frill.lineTo(Math.cos(a) * 2.05 * r, -0.3 + Math.sin(a) * 2.5 * r); }
+    frill.closePath();
+    head.add(skinMesh([place(new THREE.ShapeGeometry(frill, 2), 0, 0.55, 0.15, -0.45, 0, 0)], frillPal, skinMat2));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.9, 1.2); head.add(jaw);
+    jaw.add(skinMesh([place(tbox(0.9, 0.35, 1.3, 0.45, 1.8), 0, -0.1, 0.9)], hp));
+    const tail = chain(body, 0, 3.0, -2.9, [{ len: 1.3, r0: 0.9, r1: 0.65, bend: 0.1 }, { len: 1.3, r0: 0.65, r1: 0.38, bend: 0.08 }, { len: 1.4, r0: 0.38, r1: 0.08, bend: 0.05 }], pal, true);
+    const legs = [
+      makeLeg(body, 1.35, 1.9, 1.35, 1.25, 0.52, 1.1, pal, { kneeRest: 0.12, hooves: true }), makeLeg(body, -1.35, 1.9, 1.35, 1.25, 0.52, 1.1, pal, { kneeRest: 0.12, hooves: true }),
+      makeLeg(body, 1.35, -1.9, 1.35, 1.25, 0.55, 1.1, pal, { kneeRest: 0.12, hooves: true }), makeLeg(body, -1.35, -1.9, 1.35, 1.25, 0.55, 1.1, pal, { kneeRest: 0.12, hooves: true })];
+    return { group: g, body, legs, legPhases: [0, Math.PI, Math.PI, 0], legAmp: 0.4, stride: 0.9, tail: tail.pivots, neck: [], head, jaw, drinkAngle: 0.75, headComp: 0, name: 'Triceratops' };
+  }
+
+  // ------------------------------- Pterosaurs --------------------------------
+  const PTERO = {
+    quetz: { span: 1.0, neck: 1.0, beak: 3.8, crest: 'quetz', tail: 0, teeth: false, name: 'Quetzalcoatlus',
+      pal: { top: 0x7d5f3e, belly: 0xe2d2ad, accent: 0x3d2b1a, yBelly: -0.6, yTop: 0.6, f: 0.7, spots: 0.4 }, memb: { top: 0x5b3e2c, belly: 0x7a563d, accent: 0x3a2619, yBelly: -1, yTop: 1, f: 0.35, spots: 0.5 } },
+    pteranodon: { span: 0.42, neck: 0.8, beak: 3.2, crest: 'blade', tail: 0, teeth: false, name: 'Pteranodon',
+      pal: { top: 0x55636f, belly: 0xe8e4d6, accent: 0x2d363f, yBelly: -0.6, yTop: 0.6, f: 0.7, spots: 0.4 }, memb: { top: 0x3f4a53, belly: 0x5e6b75, accent: 0x262e35, yBelly: -1, yTop: 1, f: 0.35, spots: 0.5 } },
+    rhamph: { span: 0.22, neck: 0.5, beak: 2.2, crest: 'none', tail: 7.0, teeth: true, name: 'Rhamphorhynchus',
+      pal: { top: 0x7a5a2e, belly: 0xdcc99c, accent: 0x3a2a14, yBelly: -0.6, yTop: 0.6, f: 0.9, spots: 0.4 }, memb: { top: 0x4e3a23, belly: 0x6a5233, accent: 0x2e2114, yBelly: -1, yTop: 1, f: 0.4, spots: 0.5 } },
+  };
+  function buildPterosaur(kind) {
+    const k = PTERO[kind];
+    const g = new THREE.Group();
+    const pal = k.pal;
+    g.add(skinMesh([place(ell(0.9, 0.82, 2.3, 14), 0, 0, 0), place(ell(0.75, 0.6, 1.4, 10), 0, -0.2, 0.9), place(ell(0.55, 0.5, 1.2, 8), 0, 0.05, -1.7)], pal));
+    const neck = chain(g, 0, 0.35, 2.0, [{ len: 1.6 * k.neck, r0: 0.5, r1: 0.4, bend: -0.75 }, { len: 1.6 * k.neck, r0: 0.4, r1: 0.34, bend: 0.5 }], withOff(pal, 0), false);
+    const head = neck.end; head.rotation.x = 0.25; head.userData.rest = 0.25;
+    const hp = withOff(pal, 0);
+    const headParts = [place(ell(0.48, 0.5, 0.7, 12), 0, 0.05, 0.2), place(tbox(0.28, 0.24, 0.62, 0.5, k.beak), 0, -0.02, 0.5 + k.beak / 2), ...eyePair(0.36, 0.2, 0.3, 0.11, 0x1a1410)];
+    if (k.teeth) headParts.push(...teethRow(4, 0.12, -0.2, 0.9, 0.4, 0.22, true));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.2, 0.3); head.add(jaw);
+    jaw.add(skinMesh([place(tbox(0.22, 0.14, 0.5, 0.26, k.beak * 0.95), 0, -0.07, k.beak * 0.48)], hp));
+    head.add(skinMesh(headParts, hp));
+    const crestPal = { top: 0xb8402a, belly: 0xd97a4a, accent: 0x6e1f12, yBelly: 0, yTop: 1.2, f: 1.2, spots: 0.5 };
+    if (k.crest === 'quetz') head.add(skinMesh([place(tbox(0.14, 0.95, 0.06, 0.35, 1.3), 0, 0.72, -0.25, 0.45, 0, 0)], crestPal, skinMat2));
+    if (k.crest === 'blade') head.add(skinMesh([place(tbox(0.1, 0.55, 0.05, 0.12, 2.6), 0, 0.5, -1.35, 0.3, 0, 0)], crestPal, skinMat2));
+    for (const s of [1, -1]) g.add(skinMesh([place(new THREE.CylinderGeometry(0.1, 0.15, 2.3, 6), s * 0.45, -0.6, -1.7, 1.25, 0, 0), [place(coneZ(0.09, 0.4, 5), s * 0.45, -1.15, -2.7), 0x2a2420]], pal));
+    let tail = null;
+    if (k.tail > 0) {
+      const t = chain(g, 0, 0, -2.6, [{ len: k.tail / 3, r0: 0.28, r1: 0.16, bend: 0.05 }, { len: k.tail / 3, r0: 0.16, r1: 0.09, bend: 0.02 }, { len: k.tail / 3, r0: 0.09, r1: 0.04, bend: 0 }], pal, true);
+      const vane = new THREE.Shape(); vane.moveTo(0, -0.6); vane.lineTo(0, 1.1); vane.quadraticCurveTo(1.6, 1.0, 1.9, 0.1); vane.quadraticCurveTo(1.6, -0.5, 0, -0.6);
+      t.pivots[2].add(skinMesh([place(new THREE.ShapeGeometry(vane, 8), 0, 0, -k.tail / 3 + 0.5, 0, -Math.PI / 2, 0)], k.memb, skinMat2));
+      tail = t.pivots;
+    }
+    function wingGeo(pts) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) { const p = pts[i]; if (p.length === 4) s.quadraticCurveTo(p[0], p[1], p[2], p[3]); else s.lineTo(p[0], p[1]); } s.closePath(); const geo = new THREE.ShapeGeometry(s, 10); geo.rotateX(-Math.PI / 2); return geo; }
+    const L1 = 4.2, L2 = 6.0;
+    const innerGeo = () => wingGeo([[0, -1.15], [L1, -0.8], [L1, 0.9], [L1 * 0.45, 1.7, 0, 2.2]]);
+    const outerGeo = () => wingGeo([[0, -0.8], [L2 * 0.5, -0.5], [L2, -0.08], [L2, 0.02], [L2 * 0.4, 0.55, 0, 0.9]]);
+    function buildWing() {
+      const root = new THREE.Group(); root.position.set(0.75, 0.3, 1.0);
+      const inner = new THREE.Group(); root.add(inner);
+      inner.add(skinMesh([innerGeo()], k.memb, skinMat2));
+      inner.add(skinMesh([place(frustum(0.12, 0.17, L1 + 0.1, 7), L1 / 2, 0.03, -0.98, 0, Math.PI / 2 - Math.atan2(0.35, L1), 0), place(ell(0.2, 0.18, 0.22, 8), L1, 0.03, -0.8)], pal));
+      const outer = new THREE.Group(); outer.position.set(L1, 0, 0); inner.add(outer);
+      outer.add(skinMesh([outerGeo()], k.memb, skinMat2));
+      outer.add(skinMesh([place(frustum(0.04, 0.11, L2 + 0.1, 6), L2 / 2, 0.02, -0.44, 0, Math.PI / 2 - Math.atan2(0.72, L2), 0)], pal));
+      return { root, inner, outer };
+    }
+    const right = buildWing(); g.add(right.root);
+    const leftContainer = new THREE.Group(); leftContainer.scale.x = -1; g.add(leftContainer);
+    const left = buildWing(); leftContainer.add(left.root);
+    g.rotation.order = 'YXZ';
+    g.scale.setScalar(k.span);
+    return { group: g, wings: [right, left], head, neck: neck.pivots, jaw, tail, kind, name: k.name };
+  }
+
+  const quetz = buildPterosaur('quetz');
+  scene.add(quetz.group);
+
+  // ---------------------------------------------------------------------------
+  // Populate dinosaurs
+  // ---------------------------------------------------------------------------
+  const dinos = [];
+  function placeDino(spec, x, z, yaw, opts) {
+    spec.group.position.set(x, terrainH(x, z), z);
+    spec.group.rotation.y = yaw;
+    scene.add(spec.group);
+    const d = Object.assign({
+      role: 'wander', state: 'idle', timer: rand(0.5, 3), phase: rand(0, TAU), seed: rand(0, 100),
+      x, z, yaw, home: { x, z }, roam: 130, speed: 4, speedNow: 0, minH: 2.0, target: null,
+      drinking: false, drinkT: 0, walkT: 0, roarTimer: rand(6, 25), roarT: 0,
+      hunt: 0, lungeT: 0, lungeCd: 0, lungeK: 0, lungeJaw: 0, aim: 0, snapped: false,
+    }, spec, opts || {});
+    dinos.push(d);
+    return d;
+  }
+  function randomLandNear(cx, cz, radius, minH) {
+    for (let i = 0; i < 40; i++) {
+      const a = rand(0, TAU), r = Math.sqrt(Math.random()) * radius;
+      const x = clamp(cx + Math.cos(a) * r, -560, 560), z = clamp(cz + Math.sin(a) * r, -560, 560);
+      const h = terrainH(x, z);
+      if (h >= minH && h < 30) return { x, z };
+    }
+    return { x: cx, z: cz };
+  }
+  function shoreSpot(L, a, k) {
+    const x = L.x + Math.cos(a) * L.r * (k || 1.07), z = L.z + Math.sin(a) * L.r * (k || 1.07);
+    return { x, z, yaw: Math.atan2(L.x - x, L.z - z) };
+  }
+
+  for (let i = 0; i < 4; i++) {
+    const s = landSpot(2.5, 25, 480, 80, (x, z) => nearestLakeDist(x, z) > 25) || { x: 200, z: 200 };
+    placeDino(buildTRex(), s.x, s.z, rand(0, TAU), { speed: 4.5 });
+  }
+  [0, 1, 3].forEach((li) => {
+    const L = LAKES[li]; const s = shoreSpot(L, rand(0, TAU), 1.25);
+    placeDino(buildSpino(), s.x, s.z, s.yaw, { speed: 3.8, minH: -2.6, roam: 70, home: { x: L.x, z: L.z } });
+  });
+  { const s = shoreSpot(LAKES[5], rand(0, TAU)); placeDino(buildSpino(), s.x, s.z, s.yaw, { role: 'drinker', drinking: true, timer: rand(2, 5), minH: -2.6 }); }
+  { const s = shoreSpot(LAKES[0], 0.6, 1.12); placeDino(buildBrachio(), s.x, s.z, s.yaw, { role: 'drinker', drinking: true, timer: rand(3, 6) }); }
+  { const s = shoreSpot(LAKES[0], 1.3, 1.12); placeDino(buildBrachio(), s.x, s.z, s.yaw, { role: 'drinker', drinking: false, timer: rand(2, 4) }); }
+  { const s = randomLandNear(LAKES[2].x - 120, LAKES[2].z - 60, 60, 2.6); placeDino(buildBrachio(), s.x, s.z, rand(0, TAU), { speed: 2.6, roam: 110 }); }
+  for (let i = 0; i < 3; i++) { const s = shoreSpot(LAKES[1], 2.6 + i * 0.45); placeDino(buildTrike(), s.x, s.z, s.yaw, { role: 'drinker', drinking: Math.random() < 0.6, timer: rand(1, 5) }); }
+  for (let i = 0; i < 3; i++) { const s = randomLandNear(LAKES[2].x + 110, LAKES[2].z, 50, 2.6); placeDino(buildTrike(), s.x, s.z, rand(0, TAU), { speed: 3.2, roam: 80, home: { x: LAKES[2].x + 110, z: LAKES[2].z } }); }
+  function spawnPack(cx, cz, n) {
+    const leader = placeDino(buildRaptor(), cx, cz, rand(0, TAU), { speed: 11, roam: 160 });
+    for (let i = 1; i < n; i++) {
+      const off = { x: rand(-6, 6), z: rand(-6, 6) };
+      placeDino(buildRaptor(), cx + off.x, cz + off.z, leader.yaw, { role: 'follower', leader, off, speed: 12.5 });
+    }
+  }
+  { const s = landSpot(2.5, 25, 450, 80, (x, z) => nearestLakeDist(x, z) > 30) || { x: -100, z: 100 }; spawnPack(s.x, s.z, 4); }
+  { const s = landSpot(2.5, 25, 450, 80, (x, z) => nearestLakeDist(x, z) > 30) || { x: 300, z: -300 }; spawnPack(s.x, s.z, 5); }
+  for (let i = 0; i < 3; i++) { const s = shoreSpot(LAKES[4], 4.0 + i * 0.25, 1.05); placeDino(buildRaptor(), s.x, s.z, s.yaw, { role: 'drinker', drinking: Math.random() < 0.5, timer: rand(1, 4) }); }
+
+  // ---------------------------------------------------------------------------
+  // Pterosaur flocks
+  // ---------------------------------------------------------------------------
+  const flocks = [], flyers = [];
+  function addFlock(kind, cx, cz, alt, radius, n, opts) {
+    opts = opts || {};
+    const speed = opts.speed || (kind === 'rhamph' ? 11 : kind === 'pteranodon' ? 17 : 21);
+    const flock = { cx, cz, alt, radius, dir: Math.random() < 0.5 ? 1 : -1, angle: rand(0, TAU), angSpeed: speed / radius, speed, members: [], seed: rand(0, 100) };
+    for (let i = 0; i < n; i++) {
+      const model = buildPterosaur(kind);
+      scene.add(model.group);
+      const m = { model, kind, seed: rand(0, 100), flapPhase: rand(0, TAU), flapRate: kind === 'rhamph' ? 6.5 : kind === 'pteranodon' ? 4.2 : 3.0, flock, x: cx, y: alt, z: cz, yaw: 0 };
+      if (opts.v) { const side = i % 2 ? 1 : -1, rank = Math.ceil(i / 2); m.aOff = -rank * (9 / radius); m.rOff = side * rank * 6; m.altOff = -rank * 1.2; }
+      else { m.aOff = rand(0, TAU); m.rOff = rand(-radius * 0.25, radius * 0.25); m.altOff = rand(-8, 8); }
+      flock.members.push(m); flyers.push(m);
+    }
+    flocks.push(flock);
+  }
+  addFlock('pteranodon', LAKES[0].x, LAKES[0].z, 48, 85, 5);
+  addFlock('pteranodon', LAKES[3].x, LAKES[3].z, 58, 70, 4);
+  addFlock('pteranodon', LAKES[2].x, LAKES[2].z, 38, 60, 6);
+  addFlock('pteranodon', 0, 0, 135, 470, 7, { v: true, speed: 20 });
+  addFlock('rhamph', LAKES[1].x, LAKES[1].z, 15, 42, 7);
+  addFlock('rhamph', LAKES[4].x, LAKES[4].z, 13, 36, 6);
+  addFlock('rhamph', LAKES[5].x, LAKES[5].z, 17, 45, 6);
+  addFlock('quetz', 40, 60, 95, 230, 2);
+  addFlock('quetz', 320, -320, 82, 160, 1);
+  addFlock('quetz', -360, 380, 70, 140, 1);
+
+  function animateWings(model, flap, flapOuter) {
+    for (const w of model.wings) { w.inner.rotation.z = flap; w.outer.rotation.z = flapOuter; }
+  }
+  function updateFlyers(dt, t) {
+    for (const f of flocks) f.angle += f.dir * f.angSpeed * dt;
+    for (const m of flyers) {
+      const f = m.flock;
+      const a = f.angle + m.aOff, r = f.radius + m.rOff;
+      const x = f.cx + Math.cos(a) * r, z = f.cz + Math.sin(a) * r;
+      let y = f.alt + m.altOff + Math.sin(t * 0.3 + m.seed) * 6;
+      y = Math.max(y, terrainH(x, z) + 9);
+      const yaw = Math.atan2(-f.dir * Math.sin(a), f.dir * Math.cos(a));
+      const pitch = clamp((y - m.y) / Math.max(dt, 1e-3) / f.speed, -0.4, 0.4) * 0.8;
+      m.x = x; m.y = y; m.z = z; m.yaw = yaw;
+      const env = clamp(Math.sin(t * 0.22 + m.seed) * 1.8, 0, 1);
+      const amp = 0.08 + 0.55 * env;
+      m.flapPhase += m.flapRate * (0.5 + 0.5 * env) * dt;
+      const flap = Math.sin(m.flapPhase) * amp + 0.15 * (1 - env);
+      const g = m.model.group;
+      g.position.set(x, y + Math.sin(m.flapPhase) * 0.1 * amp * g.scale.x, z);
+      g.rotation.set(-pitch, yaw, f.dir * 0.38);
+      animateWings(m.model, flap, Math.sin(m.flapPhase - 0.55) * amp * 0.9);
+      m.model.head.rotation.x = m.model.head.userData.rest + pitch * 0.4;
+      if (m.model.tail) for (let i = 0; i < m.model.tail.length; i++) m.model.tail[i].rotation.y = Math.sin(t * 2 + m.seed - i) * 0.08;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Player state & input (keyboard + touch D-pad)
+  // ---------------------------------------------------------------------------
+  const P = { x: 40, y: 45, z: -330, yaw: 0.0, pitch: 0, bank: 0, speed: 30, flapPhase: 0, flapAmp: 0.4, flapRate: 4.2 };
+  const keys = {};
+  window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); });
+  window.addEventListener('keyup', e => { keys[e.code] = false; });
+  window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
+
+  const touch = { active: false, id: null, x: 0, y: 0 };
+  const dpad = document.getElementById('dpad');
+  const knob = dpad.querySelector('.knob');
+  const arrows = { up: dpad.querySelector('.up'), down: dpad.querySelector('.down'), left: dpad.querySelector('.left'), right: dpad.querySelector('.right') };
+  if (isTouch) document.body.classList.add('touch');
+  window.addEventListener('touchstart', () => document.body.classList.add('touch'), { once: true, passive: true });
+  function padUpdate(e) {
+    const r = dpad.getBoundingClientRect();
+    let dx = (e.clientX - (r.left + r.width / 2)) / (r.width / 2), dy = (e.clientY - (r.top + r.height / 2)) / (r.height / 2);
+    const len = Math.hypot(dx, dy); if (len > 1) { dx /= len; dy /= len; }
+    touch.x = dx; touch.y = dy;
+    knob.style.transform = `translate(${dx * 52}px, ${dy * 52}px)`;
+    arrows.up.classList.toggle('on', dy < -0.35); arrows.down.classList.toggle('on', dy > 0.35);
+    arrows.left.classList.toggle('on', dx < -0.35); arrows.right.classList.toggle('on', dx > 0.35);
+  }
+  function padEnd(e) {
+    if (e.pointerId !== touch.id) return;
+    touch.active = false; touch.x = 0; touch.y = 0; touch.id = null;
+    knob.style.transform = ''; for (const k in arrows) arrows[k].classList.remove('on');
+  }
+  dpad.addEventListener('pointerdown', e => { touch.active = true; touch.id = e.pointerId; try { dpad.setPointerCapture(e.pointerId); } catch (_) {} padUpdate(e); e.preventDefault(); });
+  dpad.addEventListener('pointermove', e => { if (touch.active && e.pointerId === touch.id) padUpdate(e); });
+  dpad.addEventListener('pointerup', padEnd); dpad.addEventListener('pointercancel', padEnd); dpad.addEventListener('lostpointercapture', padEnd);
+  // any touch on the scene itself also steers: the pad follows the finger's start point
+  renderer.domElement.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'touch' || touch.active) return;
+    document.body.classList.add('touch');
+    dpad.style.right = 'auto'; dpad.style.bottom = 'auto';
+    dpad.style.left = (e.clientX - 88) + 'px'; dpad.style.top = (e.clientY - 88) + 'px';
+    touch.active = true; touch.id = e.pointerId; try { dpad.setPointerCapture(e.pointerId); } catch (_) {} padUpdate(e);
+  });
+  const deadzone = v => Math.abs(v) < 0.18 ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - 0.18) / 0.55);
+
+  const forward = new THREE.Vector3();
+  const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3(), camLookCur = new THREE.Vector3();
+  let camInit = false, shake = 0;
+
+  function updatePlayer(dt) {
+    let turn = (keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0);
+    let climb = (keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0);
+    if (touch.active) { turn = deadzone(-touch.x); climb = deadzone(-touch.y); }
+
+    P.yaw += turn * 1.05 * dt;
+    P.bank = damp(P.bank, -turn * 0.65, 4, dt);
+    P.pitch = damp(P.pitch, climb * 0.48, 3, dt);
+    P.speed = damp(P.speed, 30 - P.pitch * 24, 1.5, dt);
+
+    forward.set(Math.sin(P.yaw), 0, Math.cos(P.yaw));
+    const horiz = P.speed * Math.cos(P.pitch);
+    P.x += forward.x * horiz * dt;
+    P.z += forward.z * horiz * dt;
+    P.y += Math.sin(P.pitch) * P.speed * 1.25 * dt;
+
+    P.x = clamp(P.x, -HALF + 30, HALF - 30);
+    P.z = clamp(P.z, -HALF + 30, HALF - 30);
+    const gh = terrainH(P.x, P.z);
+    const floor = Math.max(gh, WATER_Y) + 4.5;
+    if (P.y < floor) { P.y = floor; if (P.pitch < 0) P.pitch = 0; }
+    if (P.y > 240) { P.y = 240; if (P.pitch > 0) P.pitch = 0; }
+
+    let rateT = 4.2, ampT = 0.42;
+    if (climb > 0.15) { rateT = 4.2 + 3.3 * climb; ampT = 0.42 + 0.36 * climb; }
+    else if (climb < -0.15) { rateT = 4.2 + 2.6 * climb; ampT = 0.42 + 0.3 * climb; }
+    P.flapRate = damp(P.flapRate, rateT, 3, dt);
+    P.flapAmp = damp(P.flapAmp, ampT, 3, dt);
+    P.flapPhase += P.flapRate * dt;
+    const flap = Math.sin(P.flapPhase) * P.flapAmp + 0.12;
+    animateWings(quetz, flap, Math.sin(P.flapPhase - 0.55) * P.flapAmp * 0.9);
+    quetz.group.position.set(P.x, P.y + Math.sin(P.flapPhase) * 0.12 * P.flapAmp, P.z);
+    quetz.group.rotation.set(-P.pitch, P.yaw, P.bank);
+    quetz.head.rotation.x = quetz.head.userData.rest + P.pitch * 0.5;
+    quetz.neck[0].rotation.y = P.bank * 0.35;
+
+    const back = 15, height = 5.5 - P.pitch * 3;
+    camTarget.set(P.x - forward.x * back - Math.cos(P.yaw) * P.bank * 3, P.y + height, P.z - forward.z * back + Math.sin(P.yaw) * P.bank * 3);
+    camLook.set(P.x + forward.x * 10, P.y + 1.0 + P.pitch * 4, P.z + forward.z * 10);
+    if (!camInit) { camera.position.copy(camTarget); camLookCur.copy(camLook); camInit = true; }
+    camera.position.lerp(camTarget, 1 - Math.exp(-4.5 * dt));
+    camLookCur.lerp(camLook, 1 - Math.exp(-6 * dt));
+    shake = damp(shake, 0, 5, dt);
+    if (shake > 0.01) camera.position.add(_p.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake).multiplyScalar(1.4));
+    camera.lookAt(camLookCur);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Alerts (snaps from the carnivores)
+  // ---------------------------------------------------------------------------
+  const alertEl = document.getElementById('alert'), flashEl = document.getElementById('flash');
+  let alertTimer = 0, flashTimer = 0;
+  function alertMsg(text) {
+    alertEl.textContent = text; alertEl.style.opacity = 1; alertTimer = 1.8;
+    flashEl.style.boxShadow = 'inset 0 0 160px rgba(210,40,25,.75)'; flashTimer = 0.22;
+    shake = 0.8;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Dinosaur AI & animation
+  // ---------------------------------------------------------------------------
+  function pickTarget(d) {
+    for (let i = 0; i < 30; i++) {
+      const a = rand(0, TAU), r = rand(20, d.roam);
+      const x = clamp(d.home.x + Math.cos(a) * r, -600, 600), z = clamp(d.home.z + Math.sin(a) * r, -600, 600);
+      const h = terrainH(x, z);
+      if (h >= d.minH && h < 32) { d.target = { x, z }; return; }
+    }
+    d.target = { x: d.home.x, z: d.home.z };
+  }
+  function moveToward(d, tx, tz, speed, dt, stopDist, turnRate) {
+    const dx = tx - d.x, dz = tz - d.z, dist = Math.hypot(dx, dz);
+    if (dist < stopDist) { d.speedNow = damp(d.speedNow, 0, 6, dt); return true; }
+    const want = Math.atan2(dx, dz);
+    d.yaw = angleLerp(d.yaw, want, 1 - Math.exp(-(turnRate || 2.2) * dt));
+    d.speedNow = damp(d.speedNow, speed, 3, dt);
+    const nx = d.x + Math.sin(d.yaw) * d.speedNow * dt, nz = d.z + Math.cos(d.yaw) * d.speedNow * dt;
+    const nh = terrainH(nx, nz);
+    if (nh < d.minH || nh > 34) { return 'blocked'; }
+    d.x = nx; d.z = nz;
+    return false;
+  }
+  // Carnivores chase the player when it flies low nearby and lunge upward to snap (never connecting)
+  function updateHunt(d, dt) {
+    const dx = P.x - d.x, dz = P.z - d.z, hd = Math.hypot(dx, dz);
+    const gh = terrainH(d.x, d.z), rel = P.y - gh;
+    d.lungeCd = Math.max(0, d.lungeCd - dt);
+    if (hd < d.aggro && rel < d.threatH) { if (d.hunt <= 0) d.roarT = 1.6; d.hunt = 3.5; }
+    if (d.hunt <= 0) { d.lungeK = 0; d.lungeJaw = 0; return false; }
+    d.hunt -= dt;
+    if (hd > d.lungeDist) { if (moveToward(d, P.x, P.z, d.runSpeed, dt, d.lungeDist, 3.2) === 'blocked') d.speedNow = 0; }
+    else { d.speedNow = damp(d.speedNow, 0, 6, dt); d.yaw = angleLerp(d.yaw, Math.atan2(dx, dz), 1 - Math.exp(-4 * dt)); }
+    if (d.lungeT <= 0 && d.lungeCd <= 0 && hd < d.lungeDist * 1.5 && rel < d.biteH) { d.lungeT = 1.0; d.lungeCd = 2.4; d.snapped = false; }
+    if (d.lungeT > 0) {
+      d.lungeT -= dt * 1.15;
+      const prog = 1 - Math.max(d.lungeT, 0);
+      d.lungeK = Math.sin(Math.PI * prog);
+      d.lungeJaw = prog < 0.5 ? smoothstep(0.05, 0.4, prog) : 1 - smoothstep(0.5, 0.6, prog);
+      if (!d.snapped && prog >= 0.52) { d.snapped = true; if (hd < d.lungeDist * 1.6 && rel < d.biteH * 1.25) alertMsg(d.name + ' snapped at you!'); }
+    } else { d.lungeK = 0; d.lungeJaw = 0; }
+    d.aim = clamp(Math.atan2(P.y - (gh + d.headY), Math.max(hd, 1)), -0.2, 1.3);
+    return true;
+  }
+  function updateDino(d, dt, t) {
+    const hunting = d.carnivore ? updateHunt(d, dt) : false;
+    if (hunting) {
+      if (d.role === 'drinker') d.drinking = false;
+    } else if (d.role === 'drinker') {
+      d.timer -= dt;
+      if (d.timer <= 0) { d.drinking = !d.drinking; d.timer = d.drinking ? rand(3, 7) : rand(2, 5); }
+      d.speedNow = 0;
+    } else if (d.role === 'follower') {
+      const L = d.leader;
+      const tx = L.x + Math.sin(L.yaw) * d.off.z + Math.cos(L.yaw) * d.off.x;
+      const tz = L.z + Math.cos(L.yaw) * d.off.z - Math.sin(L.yaw) * d.off.x;
+      if (moveToward(d, tx, tz, d.speed, dt, 1.2) === 'blocked') d.speedNow = 0;
+    } else {
+      if (d.state === 'idle') {
+        d.speedNow = damp(d.speedNow, 0, 6, dt);
+        d.timer -= dt;
+        if (d.timer <= 0) { pickTarget(d); d.state = 'walk'; }
+      } else {
+        const r = moveToward(d, d.target.x, d.target.z, d.speed, dt, 2.5);
+        if (r === true || r === 'blocked') { d.state = 'idle'; d.timer = rand(2, 7); if (r === 'blocked') d.speedNow = 0; }
+      }
+    }
+    d.roarTimer -= dt;
+    if (d.roarTimer <= 0) { d.roarT = 1.6; d.roarTimer = rand(8, 30); }
+    if (d.roarT > 0) d.roarT -= dt;
+
+    d.drinkT = approach(d.drinkT, d.drinking ? 1 : 0, dt * 0.6);
+    d.walkT = damp(d.walkT, d.speedNow > 0.3 ? 1 : 0, 5, dt);
+    d.phase += dt * d.speedNow * d.stride;
+
+    const g = d.group;
+    g.position.set(d.x, terrainH(d.x, d.z) + (d.lungeK || 0) * (d.hop || 0), d.z);
+    g.rotation.y = d.yaw;
+    const w = d.walkT, lk = d.lungeK || 0;
+    for (let i = 0; i < d.legs.length; i++) {
+      const L = d.legs[i], ph = d.phase + d.legPhases[i];
+      const swing = Math.sin(ph) * d.legAmp * w;
+      const bend = Math.max(0, -Math.cos(ph)) * d.legAmp * 1.3 * w + lk * 0.35;
+      L.hip.rotation.x = swing + lk * 0.3;
+      L.knee.rotation.x = L.kneeRest + bend;
+      L.ankle.rotation.x = -(L.kneeRest + bend) - swing * 0.7 + Math.max(0, Math.sin(ph)) * 0.35 * w;
+    }
+    for (let i = 0; i < d.tail.length; i++) {
+      const p = d.tail[i];
+      p.rotation.y = Math.sin(t * 1.4 + d.seed - i * 0.7) * 0.07 * (1 + i * 0.35) + Math.sin(d.phase * 0.5 - i * 0.5) * 0.09 * w;
+      p.rotation.x = p.userData.rest + Math.sin(t * 0.9 + d.seed + i * 0.5) * 0.02 + lk * 0.08;
+    }
+    d.body.position.y = Math.abs(Math.sin(d.phase)) * 0.12 * w;
+    d.body.rotation.z = Math.sin(d.phase) * 0.03 * w;
+    d.body.rotation.x = -lk * (d.rear || 0);
+    if (d.neck.length) {
+      const n0 = d.neck[0];
+      const look = hunting ? 0 : Math.sin(t * 0.6 + d.seed) * 0.28 * (1 - 0.6 * w) * (1 - d.drinkT);
+      n0.rotation.y = look;
+      n0.rotation.x = n0.userData.rest + d.drinkT * d.drinkAngle + Math.sin(t * 1.1 + d.seed) * 0.02 - lk * (d.aim * 0.8 + 0.3);
+      for (let i = 1; i < d.neck.length; i++) d.neck[i].rotation.x = d.neck[i].userData.rest + d.drinkT * d.drinkAngle * 0.15 - lk * d.aim * 0.15;
+      d.head.rotation.x = d.head.userData.rest - d.drinkT * d.headComp - lk * 0.15;
+      d.head.rotation.y = look * 0.5;
+    } else {
+      d.head.rotation.x = d.head.userData.rest + d.drinkT * d.drinkAngle;
+      d.head.rotation.y = Math.sin(t * 0.6 + d.seed) * 0.2 * (1 - d.drinkT);
+    }
+    if (d.drinkT > 0.9) d.head.rotation.x += Math.sin(t * 2.5 + d.seed) * 0.04;
+    const roar = d.roarT > 0 ? Math.sin(Math.PI * (1 - d.roarT / 1.6)) : 0;
+    d.jaw.rotation.x = 0.03 + Math.max(roar * 0.42, (d.lungeJaw || 0) * 0.85) + (d.drinkT > 0.9 ? 0.06 + Math.sin(t * 3 + d.seed) * 0.05 : 0);
+  }
+
+  // ---------------------------------------------------------------------------
+  // HUD
+  // ---------------------------------------------------------------------------
+  const altEl = document.getElementById('alt'), spdEl = document.getElementById('spd'), nearEl = document.getElementById('near');
+  let hudTimer = 0;
+  function updateHUD(dt) {
+    if (alertTimer > 0) { alertTimer -= dt; if (alertTimer <= 0) alertEl.style.opacity = 0; }
+    if (flashTimer > 0) { flashTimer -= dt; if (flashTimer <= 0) flashEl.style.boxShadow = 'inset 0 0 160px rgba(210,40,25,0)'; }
+    hudTimer -= dt; if (hudTimer > 0) return; hudTimer = 0.15;
+    const gh = Math.max(terrainH(P.x, P.z), WATER_Y);
+    altEl.textContent = Math.round(P.y - gh);
+    spdEl.textContent = Math.round(P.speed * 3.6);
+    let best = null, bd = 1e9, hunter = null;
+    for (const d of dinos) { const dd = Math.hypot(d.x - P.x, d.z - P.z); if (dd < bd) { bd = dd; best = d; } if (d.hunt > 0 && (!hunter || dd < hunter.dd)) hunter = { d, dd }; }
+    let bestF = null, bf = 1e9;
+    for (const m of flyers) { const dd = Math.hypot(m.x - P.x, m.y - P.y, m.z - P.z); if (dd < bf) { bf = dd; bestF = m; } }
+    const lines = [];
+    if (hunter) lines.push('<span style="color:#ffb3a0">&#9888; ' + hunter.d.name + ' is hunting you</span>');
+    else if (best && bd < 90) lines.push('Below: ' + best.name);
+    if (bestF && bf < 70) lines.push('Alongside: ' + bestF.model.name);
+    nearEl.innerHTML = lines.join('<br>');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Main loop
+  // ---------------------------------------------------------------------------
+  const clock = new THREE.Clock();
+  let elapsed = 0, fpsCount = 0, fpsTime = 0, fps = 0;
+  function frame() {
+    requestAnimationFrame(frame);
+    const raw = clock.getDelta();
+    const dt = Math.min(raw, 0.05);
+    elapsed += dt;
+    fpsCount++; fpsTime += raw; if (fpsTime >= 1) { fps = fpsCount / fpsTime; fpsCount = 0; fpsTime = 0; window.__game && (window.__game.fps = fps); }
+
+    updatePlayer(dt);
+    for (const d of dinos) updateDino(d, dt, elapsed);
+    updateFlyers(dt, elapsed);
+
+    for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > HALF * 1.4) c.position.x = -HALF * 1.4; }
+    waterNormal.offset.x += dt * 0.012; waterNormal.offset.y += dt * 0.008;
+
+    sun.position.set(P.x + SUN_DIR.x * 180, P.y + SUN_DIR.y * 180, P.z + SUN_DIR.z * 180);
+    sun.target.position.set(P.x, P.y - 20, P.z);
+    sun.target.updateMatrixWorld();
+    sky.position.copy(camera.position);
+
+    updateHUD(dt);
+    renderer.render(scene, camera);
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  document.getElementById('loading').style.display = 'none';
+  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer };
+  frame();
+})();
+</script>
+</body>
+</html>
