@@ -2,6 +2,16 @@
 
 A small open-world flying game for the browser. You are a Quetzalcoatlus soaring over a Cretaceous landscape of lakes, forests and mountains, sharing the sky with Pteranodon flocks and the ground with T. rex, Spinosaurus, Velociraptor packs, Triceratops and Brachiosaurus.
 
+## Species
+
+| Ground | Sky | Water |
+| --- | --- | --- |
+| Tyrannosaurus rex, Allosaurus, Spinosaurus (hunters) | Pteranodon flocks and a migrating V formation | Mosasaurus in the big lake |
+| Velociraptor and Dilophosaurus packs (hunters) | Rhamphorhynchus skimming the lakes | |
+| Triceratops, Stegosaurus, Ankylosaurus | Wild Quetzalcoatlus soaring high | |
+| Brachiosaurus, Diplodocus | | |
+| Parasaurolophus and Gallimimus herds, Pachycephalosaurus | | |
+
 **Play it:** https://quetzalcoatlus-skies.nishant-pateluk.workers.dev
 
 ## Controls
