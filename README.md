@@ -21,6 +21,10 @@ A small open-world flying game for the browser. You are a Quetzalcoatlus soaring
 | Keyboard | Left / Right arrows (or A / D) | Up arrow (or W) | Down arrow (or S) |
 | Touch | Drag the on-screen pad left / right | Drag up | Drag down |
 
+**Landing and walking.** Fly low over land and the Quetzalcoatlus flares, slows and touches down on its hind feet. On the ground it walks the way the real animal did: on all fours, with the folded wings planted as forelimbs and the long neck held upright. Up walks, Down backs up, Left / Right turn. You cannot land on water.
+
+**Taking off.** Press Space (or tap the Take off button on touch screens). The animal crouches, vaults off its forelimbs and powers upward with deep wingbeats until it reaches flying speed.
+
 Stay high near the meat-eaters. If you fly low over a T. rex, Spinosaurus or Velociraptor it will chase you and lunge to snap you out of the air. They never actually catch you, but you will know about it.
 
 ## Running locally

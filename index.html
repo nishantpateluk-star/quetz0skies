@@ -25,6 +25,10 @@
   #dpad .knob { position: absolute; width: 60px; height: 60px; border-radius: 50%; left: 58px; top: 58px; background: rgba(255,255,255,.6); box-shadow: 0 2px 10px rgba(0,0,0,.35); pointer-events: none; }
   #touchhint { position: absolute; left: 16px; bottom: 14px; color: #fff; font-size: 13px; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: rgba(0,0,0,.25); padding: 8px 12px; border-radius: 8px; display: none; pointer-events: none; }
   body.touch #controls { display: none; } body.touch #dpad { display: block; } body.touch #touchhint { display: block; }
+  #modehint { position: absolute; left: 50%; bottom: 60px; transform: translateX(-50%); color: #fff; font-size: 17px; font-weight: 600; text-shadow: 0 1px 4px rgba(0,0,0,.7); background: rgba(0,0,0,.28); padding: 6px 14px; border-radius: 8px; display: none; pointer-events: none; white-space: nowrap; }
+  #modehint.show { display: block; }
+  #takeoff { position: absolute; left: 26px; bottom: 60px; width: 110px; height: 110px; border-radius: 50%; display: none; align-items: center; justify-content: center; color: #fff; font-size: 17px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.7); background: radial-gradient(circle, rgba(255,210,90,.7), rgba(255,160,40,.45) 70%, rgba(255,160,40,0) 72%); box-shadow: 0 0 0 2px rgba(255,255,255,.35) inset; touch-action: none; }
+  body.touch #takeoff.show { display: flex; }
   #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #3a2a1a; background: #f4e7cf; font-size: 18px; text-align: center; padding: 40px; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; background: linear-gradient(#6fb0ee, #c9e3fb); text-shadow: 0 1px 4px rgba(0,0,0,.5); }
 </style>
@@ -41,9 +45,12 @@
   <div><b>&larr; &rarr;</b> turn</div>
   <div><b>&uarr;</b> climb (flap harder)</div>
   <div><b>&darr;</b> dive (glide)</div>
-  <div style="opacity:.8;margin-top:4px">Stay high near the meat-eaters&hellip;</div>
+  <div><b>Space</b> take off</div>
+  <div style="opacity:.8;margin-top:4px">Fly low over land to touch down. Stay high near the meat-eaters&hellip;</div>
 </div>
-<div id="touchhint">Drag the pad: up climbs, down dives, sides turn</div>
+<div id="touchhint">Drag the pad: up climbs, down dives, sides turn. Fly low over land to touch down.</div>
+<div id="modehint"></div>
+<div id="takeoff">Take off</div>
 <div id="stats">
   <div>Altitude <span id="alt">0</span> m</div>
   <div>Speed <span id="spd">0</span> km/h</div>
@@ -905,7 +912,14 @@
     const crestPal = { top: 0xb8402a, belly: 0xd97a4a, accent: 0x6e1f12, yBelly: 0, yTop: 1.2, f: 1.2, spots: 0.5 };
     if (k.crest === 'quetz') head.add(skinMesh([place(tbox(0.14, 0.95, 0.06, 0.35, 1.3), 0, 0.72, -0.25, 0.45, 0, 0)], crestPal, skinMat2));
     if (k.crest === 'blade') head.add(skinMesh([place(tbox(0.1, 0.55, 0.05, 0.12, 2.6), 0, 0.5, -1.35, 0.3, 0, 0)], crestPal, skinMat2));
-    for (const s of [1, -1]) g.add(skinMesh([place(new THREE.CylinderGeometry(0.1, 0.15, 2.3, 6), s * 0.45, -0.6, -1.7, 1.25, 0, 0), [place(coneZ(0.09, 0.4, 5), s * 0.45, -1.15, -2.7), 0x2a2420]], pal));
+    // hind legs: a pivot at the hip so they can swing down for landing and walking
+    const legs = [];
+    for (const s of [1, -1]) {
+      const hip = new THREE.Group(); hip.position.set(s * 0.45, -0.3, -1.6); hip.rotation.x = 1.25; hip.userData.rest = 1.25; g.add(hip);
+      hip.add(skinMesh([place(new THREE.CylinderGeometry(0.1, 0.15, 2.3, 6), 0, -1.15, 0), place(ell(0.16, 0.14, 0.18, 7), 0, 0, 0),
+        [place(coneZ(0.08, 0.38, 5), 0.1, -2.3, 0.05), 0x2a2420], [place(coneZ(0.08, 0.38, 5), -0.1, -2.3, 0.05), 0x2a2420], [place(coneZ(0.08, 0.38, 5), 0, -2.3, 0.12), 0x2a2420]], pal));
+      legs.push(hip);
+    }
     let tail = null;
     if (k.tail > 0) {
       const t = chain(g, 0, 0, -2.6, [{ len: k.tail / 3, r0: 0.28, r1: 0.16, bend: 0.05 }, { len: k.tail / 3, r0: 0.16, r1: 0.09, bend: 0.02 }, { len: k.tail / 3, r0: 0.09, r1: 0.04, bend: 0 }], pal, true);
@@ -920,19 +934,19 @@
     function buildWing() {
       const root = new THREE.Group(); root.position.set(0.75, 0.3, 1.0);
       const inner = new THREE.Group(); root.add(inner);
-      inner.add(skinMesh([innerGeo()], k.memb, skinMat2));
+      const innerMemb = skinMesh([innerGeo()], k.memb, skinMat2); inner.add(innerMemb);
       inner.add(skinMesh([place(frustum(0.12, 0.17, L1 + 0.1, 7), L1 / 2, 0.03, -0.98, 0, Math.PI / 2 - Math.atan2(0.35, L1), 0), place(ell(0.2, 0.18, 0.22, 8), L1, 0.03, -0.8)], pal));
       const outer = new THREE.Group(); outer.position.set(L1, 0, 0); inner.add(outer);
-      outer.add(skinMesh([outerGeo()], k.memb, skinMat2));
+      const outerMemb = skinMesh([outerGeo()], k.memb, skinMat2); outer.add(outerMemb);
       outer.add(skinMesh([place(frustum(0.04, 0.11, L2 + 0.1, 6), L2 / 2, 0.02, -0.44, 0, Math.PI / 2 - Math.atan2(0.72, L2), 0)], pal));
-      return { root, inner, outer };
+      return { root, inner, outer, membs: [innerMemb, outerMemb] };
     }
     const right = buildWing(); g.add(right.root);
     const leftContainer = new THREE.Group(); leftContainer.scale.x = -1; g.add(leftContainer);
     const left = buildWing(); leftContainer.add(left.root);
     g.rotation.order = 'YXZ';
     g.scale.setScalar(k.span);
-    return { group: g, wings: [right, left], head, neck: neck.pivots, jaw, tail, kind, name: k.name };
+    return { group: g, wings: [right, left], head, neck: neck.pivots, jaw, tail, legs, kind, name: k.name };
   }
 
   const quetz = buildPterosaur('quetz');
@@ -1085,9 +1099,12 @@
   // ---------------------------------------------------------------------------
   // Player state & input (keyboard + touch D-pad)
   // ---------------------------------------------------------------------------
-  const P = { x: 40, y: 45, z: -330, yaw: 0.0, pitch: 0, bank: 0, speed: 30, flapPhase: 0, flapAmp: 0.4, flapRate: 4.2 };
+  // mode: fly -> land (flare & touchdown) -> ground (quadrupedal walk) -> takeoff (crouch, vault, powered climb) -> fly
+  const STAND_H = 2.25, GRAV = 9.81, WALK_SPEED = 2.6, BACK_SPEED = 1.0;
+  const P = { x: 40, y: 45, z: -330, yaw: 0.0, pitch: 0, bank: 0, speed: 30, flapPhase: 0, flapAmp: 0.4, flapRate: 4.2,
+    mode: 'fly', fold: 0, legOut: 0, walkPhase: 0, walkT: 0, vy: 0, modeT: 0, launched: false, crouch: 0, takeoffReq: false };
   const keys = {};
-  window.addEventListener('keydown', e => { keys[e.code] = true; if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); });
+  window.addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat) P.takeoffReq = true; keys[e.code] = true; if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); });
   window.addEventListener('keyup', e => { keys[e.code] = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
@@ -1123,50 +1140,143 @@
     touch.active = true; touch.id = e.pointerId; try { dpad.setPointerCapture(e.pointerId); } catch (_) {} padUpdate(e);
   });
   const deadzone = v => Math.abs(v) < 0.18 ? 0 : Math.sign(v) * Math.min(1, (Math.abs(v) - 0.18) / 0.55);
+  const takeoffBtn = document.getElementById('takeoff'), modeHint = document.getElementById('modehint');
+  takeoffBtn.addEventListener('pointerdown', e => { P.takeoffReq = true; e.preventDefault(); e.stopPropagation(); });
 
   const forward = new THREE.Vector3();
   const camTarget = new THREE.Vector3(), camLook = new THREE.Vector3(), camLookCur = new THREE.Vector3();
   let camInit = false, shake = 0;
 
+  // scratch objects for the wing-folding maths
+  const X_AXIS = new THREE.Vector3(1, 0, 0), _eul = new THREE.Euler(), _qA = new THREE.Quaternion(), _qB = new THREE.Quaternion(), _qInv = new THREE.Quaternion(), _dir = new THREE.Vector3();
+  // Standing pose, expressed in the body frame (which is pitched nose-up by 0.3 rad when standing):
+  // the folded arm reaches down and forward to plant the "hand" level with the hind feet, the wing finger folds up and back.
+  const HAND_DIR = new THREE.Vector3(1.0, -3.56, 2.04), FINGER_DIR = new THREE.Vector3(0.18, 0.78, -0.6), STAND_PITCH = 0.3;
+
   function updatePlayer(dt) {
     let turn = (keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0);
     let climb = (keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0);
     if (touch.active) { turn = deadzone(-touch.x); climb = deadzone(-touch.y); }
-
-    P.yaw += turn * 1.05 * dt;
-    P.bank = damp(P.bank, -turn * 0.65, 4, dt);
-    P.pitch = damp(P.pitch, climb * 0.48, 3, dt);
-    P.speed = damp(P.speed, 30 - P.pitch * 24, 1.5, dt);
+    const takeoffReq = P.takeoffReq; P.takeoffReq = false;
 
     forward.set(Math.sin(P.yaw), 0, Math.cos(P.yaw));
-    const horiz = P.speed * Math.cos(P.pitch);
-    P.x += forward.x * horiz * dt;
-    P.z += forward.z * horiz * dt;
-    P.y += Math.sin(P.pitch) * P.speed * 1.25 * dt;
+    let gh = terrainH(P.x, P.z);
+    const overWater = gh < WATER_Y + 0.4;
+    let rateT = 4.2, ampT = 0.42, foldT = 0, legT = 0;
+    P.modeT += dt;
 
-    P.x = clamp(P.x, -HALF + 30, HALF - 30);
-    P.z = clamp(P.z, -HALF + 30, HALF - 30);
-    const gh = terrainH(P.x, P.z);
-    const floor = Math.max(gh, WATER_Y) + 4.5;
-    if (P.y < floor) { P.y = floor; if (P.pitch < 0) P.pitch = 0; }
-    if (P.y > 240) { P.y = 240; if (P.pitch > 0) P.pitch = 0; }
+    if (P.mode === 'fly') {
+      P.yaw += turn * 1.05 * dt;
+      P.bank = damp(P.bank, -turn * 0.65, 4, dt);
+      P.pitch = damp(P.pitch, climb * 0.48, 3, dt);
+      P.speed = damp(P.speed, 30 - P.pitch * 24, 1.5, dt);
+      const horiz = P.speed * Math.cos(P.pitch);
+      P.x += forward.x * horiz * dt; P.z += forward.z * horiz * dt;
+      P.y += Math.sin(P.pitch) * P.speed * 1.25 * dt;
+      P.x = clamp(P.x, -HALF + 30, HALF - 30); P.z = clamp(P.z, -HALF + 30, HALF - 30);
+      gh = terrainH(P.x, P.z);
+      if (overWater) { const floor = WATER_Y + 3.5; if (P.y < floor) { P.y = floor; if (P.pitch < 0) P.pitch = 0; } }
+      else if (P.y - gh < STAND_H + 1.0) { P.mode = 'land'; P.modeT = 0; }   // close to the ground: flare and touch down
+      if (P.y > 240) { P.y = 240; if (P.pitch > 0) P.pitch = 0; }
+      if (climb > 0.15) { rateT = 4.2 + 3.3 * climb; ampT = 0.42 + 0.36 * climb; }
+      else if (climb < -0.15) { rateT = 4.2 + 2.6 * climb; ampT = 0.42 + 0.3 * climb; }
+      // extend the legs when skimming low over land, ready to land
+      legT = overWater ? 0 : clamp(1 - (P.y - gh - STAND_H - 1) / 4, 0, 1);
+    } else if (P.mode === 'land') {
+      // Flare: nose up, wings beating against the airflow, speed bleeding off while gliding down onto the hind feet.
+      P.yaw += turn * 0.5 * dt;
+      P.bank = damp(P.bank, 0, 5, dt);
+      P.pitch = damp(P.pitch, 0.55, 5, dt);
+      P.speed = damp(P.speed, 0, 2.6, dt);
+      P.x += forward.x * P.speed * dt; P.z += forward.z * P.speed * dt;
+      gh = terrainH(P.x, P.z);
+      const target = gh + STAND_H;
+      P.y = damp(P.y, target, 4.5, dt);
+      if (P.y < target) P.y = target;
+      rateT = 8.5; ampT = 0.7; legT = 1; foldT = 0.15;
+      if ((P.speed < 1.2 && P.y - target < 0.12) || P.modeT > 3.5) { P.mode = 'ground'; P.modeT = 0; P.speed = 0; P.y = target; }
+    } else if (P.mode === 'ground') {
+      // Quadrupedal walk: hind legs plus the folded wings as forelimbs. Up walks, Down backs up, Left/Right turn.
+      P.yaw += turn * 1.3 * dt;
+      const want = climb > 0.15 ? WALK_SPEED * climb : climb < -0.15 ? BACK_SPEED * climb : 0;
+      P.speed = damp(P.speed, want, 4, dt);
+      const nx = clamp(P.x + forward.x * P.speed * dt, -HALF + 30, HALF - 30), nz = clamp(P.z + forward.z * P.speed * dt, -HALF + 30, HALF - 30);
+      if (terrainH(nx, nz) > WATER_Y + 0.6) { P.x = nx; P.z = nz; } else P.speed = 0;
+      gh = terrainH(P.x, P.z);
+      P.y = damp(P.y, gh + STAND_H, 10, dt);
+      P.pitch = damp(P.pitch, STAND_PITCH, 4, dt);
+      P.bank = damp(P.bank, 0, 4, dt);
+      P.walkPhase += Math.abs(P.speed) * 1.55 * dt;
+      rateT = 0; ampT = 0; foldT = 1; legT = 1;
+      if (takeoffReq) { P.mode = 'takeoff'; P.modeT = 0; P.launched = false; P.vy = 0; }
+    } else if (P.mode === 'takeoff') {
+      // Quadrupedal launch: crouch, vault off the forelimbs, then power upward with deep wingbeats against gravity.
+      P.yaw += turn * 0.6 * dt;
+      P.bank = damp(P.bank, 0, 4, dt);
+      if (P.modeT < 0.42) {
+        P.crouch = Math.sin(Math.PI * P.modeT / 0.42) * 0.65;
+        P.y = gh + STAND_H - P.crouch;
+        P.pitch = damp(P.pitch, STAND_PITCH + 0.15, 6, dt);
+        foldT = 0.8; legT = 1; rateT = 0; ampT = 0;
+      } else {
+        if (!P.launched) { P.launched = true; P.vy = 7.5; P.speed = Math.max(P.speed, 4.5); P.flapPhase = Math.PI * 1.5; }
+        const open = 1 - P.fold;                       // thrust arrives as the wings unfold
+        P.vy += (open * 15.5 - GRAV) * dt;
+        P.y += P.vy * dt;
+        P.speed = damp(P.speed, 26, 1.1 + open, dt);
+        P.x += forward.x * P.speed * dt; P.z += forward.z * P.speed * dt;
+        gh = terrainH(P.x, P.z);
+        if (P.y < gh + STAND_H - 0.2) { P.y = gh + STAND_H - 0.2; P.vy = Math.max(P.vy, 0); }
+        P.pitch = damp(P.pitch, 0.42, 4, dt);
+        foldT = 0; legT = clamp(1 - (P.modeT - 0.42) * 1.2, 0, 1); rateT = 8.5; ampT = 0.88;
+        if ((P.speed > 15 && P.y - gh > 5) || P.modeT > 4.5) { P.mode = 'fly'; P.modeT = 0; }
+      }
+    }
 
-    let rateT = 4.2, ampT = 0.42;
-    if (climb > 0.15) { rateT = 4.2 + 3.3 * climb; ampT = 0.42 + 0.36 * climb; }
-    else if (climb < -0.15) { rateT = 4.2 + 2.6 * climb; ampT = 0.42 + 0.3 * climb; }
+    // --- pose blending ---
+    P.fold = damp(P.fold, foldT, foldT > P.fold ? 3.5 : 7, dt);
+    P.legOut = damp(P.legOut, legT, 5, dt);
+    P.walkT = damp(P.walkT, P.mode === 'ground' && Math.abs(P.speed) > 0.2 ? 1 : 0, 6, dt);
     P.flapRate = damp(P.flapRate, rateT, 3, dt);
     P.flapAmp = damp(P.flapAmp, ampT, 3, dt);
     P.flapPhase += P.flapRate * dt;
-    const flap = Math.sin(P.flapPhase) * P.flapAmp + 0.12;
-    animateWings(quetz, flap, Math.sin(P.flapPhase - 0.55) * P.flapAmp * 0.9);
-    quetz.group.position.set(P.x, P.y + Math.sin(P.flapPhase) * 0.12 * P.flapAmp, P.z);
+    const f = P.fold;
+    const flap = Math.sin(P.flapPhase) * P.flapAmp + 0.12, flapOuter = Math.sin(P.flapPhase - 0.55) * P.flapAmp * 0.9;
+    for (let i = 0; i < 2; i++) {
+      const w = quetz.wings[i], swing = Math.sin(P.walkPhase + (i === 0 ? 0 : Math.PI)) * P.walkT;
+      _qA.setFromEuler(_eul.set(0, 0, flap));
+      _dir.copy(HAND_DIR); _dir.z += swing * 0.7; _dir.y += Math.max(0, swing) * 0.45; _dir.normalize();
+      _qB.setFromUnitVectors(X_AXIS, _dir);
+      w.inner.quaternion.slerpQuaternions(_qA, _qB, f);
+      _qA.setFromEuler(_eul.set(0, 0, flapOuter));
+      _qInv.copy(_qB).invert();
+      _dir.copy(FINGER_DIR).normalize().applyQuaternion(_qInv);
+      _qB.setFromUnitVectors(X_AXIS, _dir);
+      w.outer.quaternion.slerpQuaternions(_qA, _qB, f);
+      const furl = 1 - 0.8 * f;
+      w.membs[0].scale.z = furl; w.membs[1].scale.z = furl;
+      // hind legs: tucked in flight, hanging down for landing, striding on the ground (diagonal to the forelimbs)
+      const legSwing = Math.sin(P.walkPhase + (i === 0 ? Math.PI : 0)) * P.walkT * 0.35;
+      quetz.legs[i].rotation.x = lerp(1.25, STAND_PITCH + legSwing, P.legOut);
+    }
+    const bob = P.mode === 'ground' ? Math.abs(Math.sin(P.walkPhase)) * 0.08 * P.walkT : Math.sin(P.flapPhase) * 0.12 * P.flapAmp;
+    quetz.group.position.set(P.x, P.y + bob, P.z);
     quetz.group.rotation.set(-P.pitch, P.yaw, P.bank);
-    quetz.head.rotation.x = quetz.head.userData.rest + P.pitch * 0.5;
-    quetz.neck[0].rotation.y = P.bank * 0.35;
+    // neck rises to the upright, giraffe-like carriage when standing
+    quetz.neck[0].rotation.x = lerp(quetz.neck[0].userData.rest, -1.25, f);
+    quetz.neck[1].rotation.x = lerp(quetz.neck[1].userData.rest, 0.55, f);
+    quetz.head.rotation.x = lerp(quetz.head.userData.rest + P.pitch * 0.5, 1.0 + Math.sin(P.walkPhase * 2) * 0.03 * P.walkT, f);
+    quetz.neck[0].rotation.y = P.bank * 0.35 + turn * 0.25 * f;
 
-    const back = 15, height = 5.5 - P.pitch * 3;
+    // on-screen prompts
+    const grounded = P.mode === 'ground';
+    modeHint.textContent = grounded ? (document.body.classList.contains('touch') ? 'Tap Take off to launch' : 'Press Space to take off') : (P.mode === 'land' ? 'Touching down…' : '');
+    modeHint.classList.toggle('show', grounded || P.mode === 'land');
+    takeoffBtn.classList.toggle('show', grounded);
+
+    const back = lerp(15, 11, f), height = lerp(5.5 - P.pitch * 3, 3.2, f);
     camTarget.set(P.x - forward.x * back - Math.cos(P.yaw) * P.bank * 3, P.y + height, P.z - forward.z * back + Math.sin(P.yaw) * P.bank * 3);
-    camLook.set(P.x + forward.x * 10, P.y + 1.0 + P.pitch * 4, P.z + forward.z * 10);
+    camLook.set(P.x + forward.x * lerp(10, 6, f), lerp(P.y + 1.0 + P.pitch * 4, P.y + 2.2, f), P.z + forward.z * lerp(10, 6, f));
     if (!camInit) { camera.position.copy(camTarget); camLookCur.copy(camLook); camInit = true; }
     camera.position.lerp(camTarget, 1 - Math.exp(-4.5 * dt));
     camLookCur.lerp(camLook, 1 - Math.exp(-6 * dt));
