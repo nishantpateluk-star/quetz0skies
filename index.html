@@ -29,6 +29,24 @@
   #modehint.show { display: block; }
   #takeoff { position: absolute; left: 26px; bottom: 60px; width: 110px; height: 110px; border-radius: 50%; display: none; align-items: center; justify-content: center; color: #fff; font-size: 17px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.7); background: radial-gradient(circle, rgba(255,210,90,.7), rgba(255,160,40,.45) 70%, rgba(255,160,40,0) 72%); box-shadow: 0 0 0 2px rgba(255,255,255,.35) inset; touch-action: none; }
   body.touch #takeoff.show { display: flex; }
+  #stats button { pointer-events: auto; margin-top: 6px; background: rgba(255,255,255,.18); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; padding: 4px 10px; font: inherit; font-size: 13px; cursor: pointer; }
+  #stats button:hover { background: rgba(255,255,255,.3); }
+  #select { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(10,25,40,.55); backdrop-filter: blur(3px); color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.6); z-index: 5; }
+  #select.show { display: flex; }
+  #select h2 { margin: 0 0 6px; font-size: 30px; font-weight: 700; letter-spacing: .5px; }
+  #select p.lead { margin: 0 0 22px; opacity: .9; font-size: 15px; }
+  #select .cards { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; padding: 0 16px; }
+  #select .card { width: 230px; background: rgba(255,255,255,.12); border: 2px solid rgba(255,255,255,.35); border-radius: 14px; padding: 16px 18px; cursor: pointer; transition: transform .12s, background .12s, border-color .12s; }
+  #select .card:hover { transform: translateY(-4px); background: rgba(255,255,255,.22); border-color: #ffe27a; }
+  #select .card.active { border-color: #ffe27a; background: rgba(255,226,122,.18); }
+  #select .card .icon { font-size: 38px; line-height: 1; margin-bottom: 8px; }
+  #select .card h3 { margin: 0 0 4px; font-size: 20px; }
+  #select .card .role { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; opacity: .8; margin-bottom: 8px; }
+  #select .card p { margin: 0; font-size: 13px; line-height: 1.5; opacity: .92; }
+  #select .card .keys { margin-top: 10px; font-size: 12px; opacity: .85; }
+  #select .card .keys b { display: inline-block; background: rgba(255,255,255,.2); border-radius: 4px; padding: 0 5px; margin-right: 4px; }
+  #select .hint { margin-top: 20px; font-size: 13px; opacity: .8; }
+  @media (max-width: 760px) { #select .card { width: 42vw; min-width: 150px; padding: 12px; } #select .card p { display: none; } #select h2 { font-size: 24px; } }
   #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #3a2a1a; background: #f4e7cf; font-size: 18px; text-align: center; padding: 40px; }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; background: linear-gradient(#6fb0ee, #c9e3fb); text-shadow: 0 1px 4px rgba(0,0,0,.5); }
 </style>
@@ -38,23 +56,46 @@
 <div id="err"></div>
 <div id="flash"></div>
 <div id="hud">
-  <h1>Quetzalcoatlus</h1>
+  <h1 id="title">Quetzalcoatlus</h1>
   <div class="sub">Cretaceous Skies &middot; open world</div>
 </div>
-<div id="controls">
-  <div><b>&larr; &rarr;</b> turn</div>
-  <div><b>&uarr;</b> climb (flap harder)</div>
-  <div><b>&darr;</b> dive (glide)</div>
-  <div><b>Space</b> take off</div>
-  <div style="opacity:.8;margin-top:4px">Fly low over land to touch down. Stay high near the meat-eaters&hellip;</div>
-</div>
-<div id="touchhint">Drag the pad: up climbs, down dives, sides turn. Fly low over land to touch down.</div>
+<div id="controls"></div>
+<div id="touchhint"></div>
 <div id="modehint"></div>
 <div id="takeoff">Take off</div>
 <div id="stats">
-  <div>Altitude <span id="alt">0</span> m</div>
+  <div id="altline">Altitude <span id="alt">0</span> m</div>
   <div>Speed <span id="spd">0</span> km/h</div>
   <div id="near" style="opacity:.85"></div>
+  <button id="switch">Switch dinosaur</button>
+</div>
+<div id="select">
+  <h2>Choose your dinosaur</h2>
+  <p class="lead">You can switch at any time with the button in the corner or the 1, 2, 3 keys.</p>
+  <div class="cards">
+    <div class="card" data-kind="quetz">
+      <div class="icon">&#x1F985;</div>
+      <h3>Quetzalcoatlus</h3>
+      <div class="role">Giant pterosaur &middot; flies</div>
+      <p>Soar over the whole world, land anywhere on dry ground and stalk about on all fours. Watch out below.</p>
+      <div class="keys"><b>&uarr;&darr;</b> climb / dive <b>&larr;&rarr;</b> turn <b>Space</b> take off</div>
+    </div>
+    <div class="card" data-kind="trex">
+      <div class="icon">&#x1F996;</div>
+      <h3>Tyrannosaurus rex</h3>
+      <div class="role">Apex predator &middot; ground</div>
+      <p>Twelve metres of muscle. Nothing hunts you. Roar to scatter the herds and snap at anything that gets close.</p>
+      <div class="keys"><b>&uarr;</b> run <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> roar / bite</div>
+    </div>
+    <div class="card" data-kind="raptor">
+      <div class="icon">&#x1F426;</div>
+      <h3>Velociraptor</h3>
+      <div class="role">Fast pack hunter &middot; ground</div>
+      <p>Small, quick and agile. Sprint at 50 km/h and leap. The big carnivores will still come for you.</p>
+      <div class="keys"><b>&uarr;</b> sprint <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> leap / bite</div>
+    </div>
+  </div>
+  <div class="hint">Press Esc to close</div>
 </div>
 <div id="alert"></div>
 <div id="dpad">
@@ -1321,23 +1362,34 @@
     return false;
   }
   // Carnivores chase the player when it flies low nearby and lunge upward to snap (never connecting)
+  // Advance a lunge/snap: body rears (lungeK 0->1->0) while the jaw opens then snaps shut (lungeJaw). onSnap fires at the bite moment.
+  function tickLunge(d, dt, onSnap) {
+    if (d.lungeT > 0) {
+      d.lungeT -= dt * 1.15;
+      const prog = 1 - Math.max(d.lungeT, 0);
+      d.lungeK = Math.sin(Math.PI * prog);
+      d.lungeJaw = prog < 0.5 ? smoothstep(0.05, 0.4, prog) : 1 - smoothstep(0.5, 0.6, prog);
+      if (!d.snapped && prog >= 0.52) { d.snapped = true; if (onSnap) onSnap(); }
+    } else { d.lungeK = 0; d.lungeJaw = 0; }
+  }
+  // Which carnivores bother with the player: everything hunts the pterosaur, the big ones hunt a player raptor, nobody hunts a player T. rex.
+  function huntsPlayer(d) {
+    if (player.kind === 'quetz') return true;
+    if (player.kind === 'raptor') return d.name !== 'Velociraptor' && d.name !== 'Dilophosaurus';
+    return false;
+  }
   function updateHunt(d, dt) {
+    d.lungeCd = Math.max(0, d.lungeCd - dt);
+    if (!huntsPlayer(d)) { d.hunt = 0; tickLunge(d, dt); return false; }
     const dx = P.x - d.x, dz = P.z - d.z, hd = Math.hypot(dx, dz);
     const gh = terrainH(d.x, d.z), rel = P.y - gh;
-    d.lungeCd = Math.max(0, d.lungeCd - dt);
     if (hd < d.aggro && rel < d.threatH) { if (d.hunt <= 0) d.roarT = 1.6; d.hunt = 3.5; }
     if (d.hunt <= 0) { d.lungeK = 0; d.lungeJaw = 0; return false; }
     d.hunt -= dt;
     if (hd > d.lungeDist) { if (moveToward(d, P.x, P.z, d.runSpeed, dt, d.lungeDist, 3.2) === 'blocked') d.speedNow = 0; }
     else { d.speedNow = damp(d.speedNow, 0, 6, dt); d.yaw = angleLerp(d.yaw, Math.atan2(dx, dz), 1 - Math.exp(-4 * dt)); }
     if (d.lungeT <= 0 && d.lungeCd <= 0 && hd < d.lungeDist * 1.5 && rel < d.biteH) { d.lungeT = 1.0; d.lungeCd = 2.4; d.snapped = false; }
-    if (d.lungeT > 0) {
-      d.lungeT -= dt * 1.15;
-      const prog = 1 - Math.max(d.lungeT, 0);
-      d.lungeK = Math.sin(Math.PI * prog);
-      d.lungeJaw = prog < 0.5 ? smoothstep(0.05, 0.4, prog) : 1 - smoothstep(0.5, 0.6, prog);
-      if (!d.snapped && prog >= 0.52) { d.snapped = true; if (hd < d.lungeDist * 1.6 && rel < d.biteH * 1.25) alertMsg(d.name + ' snapped at you!'); }
-    } else { d.lungeK = 0; d.lungeJaw = 0; }
+    tickLunge(d, dt, () => { if (hd < d.lungeDist * 1.6 && rel < d.biteH * 1.25) alertMsg(d.name + ' snapped at you!'); });
     d.aim = clamp(Math.atan2(P.y - (gh + d.headY), Math.max(hd, 1)), -0.2, 1.3);
     return true;
   }
@@ -1365,6 +1417,19 @@
     const hunting = d.carnivore ? updateHunt(d, dt) : false;
     if (hunting) {
       if (d.role === 'drinker') d.drinking = false;
+    } else if (d.flee > 0) {
+      // scattered by a roar: run away from the player for a few seconds
+      d.flee -= dt; d.drinking = false;
+      // run directly away from the player, or along the nearest open bearing if water or a cliff is in the way
+      const base = Math.atan2(d.x - P.x, d.z - P.z);
+      let dir = base;
+      for (const off of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, Math.PI]) {
+        const a = base + off, h = terrainH(d.x + Math.sin(a) * 14, d.z + Math.cos(a) * 14);
+        if (h > d.minH + 0.2 && h < 32) { dir = a; break; }
+      }
+      const r = moveToward(d, d.x + Math.sin(dir) * 40, d.z + Math.cos(dir) * 40, d.speed * 2.2, dt, 1, 3.5);
+      if (r === 'blocked') d.speedNow *= 0.5;
+      if (d.flee <= 0) { if (d.role === 'drinker') d.role = 'wander'; d.state = 'idle'; d.timer = rand(2, 5); }
     } else if (d.role === 'drinker') {
       d.timer -= dt;
       if (d.timer <= 0) { d.drinking = !d.drinking; d.timer = d.drinking ? rand(3, 7) : rand(2, 5); }
@@ -1384,6 +1449,10 @@
         if (r === true || r === 'blocked') { d.state = 'idle'; d.timer = rand(2, 7); if (r === 'blocked') d.speedNow = 0; }
       }
     }
+    animateDino(d, dt, t, hunting);
+  }
+  // Shared skeleton animation for AI dinosaurs and player-controlled ones
+  function animateDino(d, dt, t, hunting) {
     d.roarTimer -= dt;
     if (d.roarTimer <= 0) { d.roarT = 1.6; d.roarTimer = rand(8, 30); }
     if (d.roarT > 0) d.roarT -= dt;
@@ -1430,6 +1499,123 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Playable characters: the pterosaur plus two ground dinosaurs
+  // ---------------------------------------------------------------------------
+  const CHAR = {
+    quetz: { name: 'Quetzalcoatlus', action: 'Take off',
+      controls: '<div><b>&larr; &rarr;</b> turn</div><div><b>&uarr;</b> climb (flap harder)</div><div><b>&darr;</b> dive (glide)</div><div><b>Space</b> take off</div><div style="opacity:.8;margin-top:4px">Fly low over land to touch down. Stay high near the meat-eaters&hellip;</div>',
+      touch: 'Drag the pad: up climbs, down dives, sides turn. Fly low over land to touch down.' },
+    trex: { name: 'Tyrannosaurus rex', build: buildTRex, run: 8.0, back: 1.6, turn: 1.0, camBack: 24, camH: 9.5, lookH: 6, minH: -0.8, hop: 0.5, rear: 0.35, action: 'Roar', scare: 55,
+      controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Roar near the herds and watch them scatter.</div>',
+      touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
+    raptor: { name: 'Velociraptor', build: buildRaptor, run: 14.0, back: 2.5, turn: 2.2, camBack: 9, camH: 3.4, lookH: 1.8, minH: 0.6, hop: 3.8, rear: 0.5, action: 'Leap', scare: 0,
+      controls: '<div><b>&uarr;</b> sprint</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> leap / bite</div><div style="opacity:.8;margin-top:4px">The big carnivores will still hunt you. Stay quick.</div>',
+      touch: 'Drag the pad: up sprints, down backs up, sides turn. Tap Leap to jump.' },
+  };
+  const player = { kind: 'quetz', dino: null, models: {} };
+  const controlsEl = document.getElementById('controls'), touchHintEl = document.getElementById('touchhint'), titleEl = document.getElementById('title'), altLine = document.getElementById('altline');
+  const selectEl = document.getElementById('select');
+
+  function landNearPlayer() {
+    if (terrainH(P.x, P.z) > 1.5 && Math.abs(P.x) < 700 && Math.abs(P.z) < 700) return { x: P.x, z: P.z };
+    const s = randomLandNear(clamp(P.x, -600, 600), clamp(P.z, -600, 600), 140, 2.0);
+    return { x: s.x, z: s.z };
+  }
+  function selectCharacter(kind) {
+    if (!CHAR[kind]) return;
+    const cfg = CHAR[kind];
+    if (player.dino) { player.dino.group.visible = false; }
+    if (kind === 'quetz') {
+      quetz.group.visible = true;
+      player.dino = null;
+      if (player.kind !== 'quetz') { P.y = terrainH(P.x, P.z) + 40; P.mode = 'fly'; P.speed = 26; P.pitch = 0; P.fold = 0; P.legOut = 0; }
+    } else {
+      quetz.group.visible = false;
+      let d = player.models[kind];
+      if (!d) {
+        const spec = cfg.build();
+        d = Object.assign({ x: 0, z: 0, yaw: 0, speedNow: 0, phase: 0, walkT: 0, drinkT: 0, drinking: false, roarTimer: 1e9, roarT: 0, lungeT: 0, lungeCd: 0, lungeK: 0, lungeJaw: 0, aim: 0.35, snapped: false, seed: rand(0, 100), hunt: 0 }, spec);
+        d.hop = cfg.hop; d.rear = cfg.rear;
+        scene.add(d.group);
+        player.models[kind] = d;
+      }
+      const s = landNearPlayer();
+      d.x = s.x; d.z = s.z; d.yaw = P.yaw; d.speedNow = 0; d.group.visible = true;
+      player.dino = d;
+      P.x = d.x; P.z = d.z; P.y = terrainH(d.x, d.z) + 2;
+      camInit = false;
+    }
+    player.kind = kind;
+    titleEl.textContent = cfg.name;
+    controlsEl.innerHTML = cfg.controls;
+    touchHintEl.textContent = cfg.touch;
+    takeoffBtn.textContent = cfg.action;
+    altLine.style.display = kind === 'quetz' ? '' : 'none';
+    for (const c of selectEl.querySelectorAll('.card')) c.classList.toggle('active', c.dataset.kind === kind);
+    for (const d of dinos) if (d.hunt > 0 && !huntsPlayer(d)) d.hunt = 0;
+  }
+  function showSelect(show) { selectEl.classList.toggle('show', show); }
+  for (const c of selectEl.querySelectorAll('.card')) c.addEventListener('click', () => { selectCharacter(c.dataset.kind); showSelect(false); });
+  document.getElementById('switch').addEventListener('click', () => showSelect(!selectEl.classList.contains('show')));
+  window.addEventListener('keydown', e => {
+    if (e.code === 'Escape') showSelect(!selectEl.classList.contains('show'));
+    if (e.code === 'Digit1') { selectCharacter('quetz'); showSelect(false); }
+    if (e.code === 'Digit2') { selectCharacter('trex'); showSelect(false); }
+    if (e.code === 'Digit3') { selectCharacter('raptor'); showSelect(false); }
+  });
+
+  // T. rex roar: nearby plant-eaters bolt
+  function scareHerds(radius) {
+    for (const d of dinos) {
+      if (d.carnivore || d.role === 'swim') continue;
+      if (Math.hypot(d.x - P.x, d.z - P.z) < radius) { d.flee = rand(4, 7); d.state = 'walk'; d.minH = Math.min(d.minH, WATER_Y + 0.6); }   // drinkers stand on the low shore, so let them run across it
+    }
+  }
+
+  function updateGroundPlayer(dt, t) {
+    const d = player.dino, cfg = CHAR[player.kind];
+    let turn = (keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0);
+    let move = (keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0);
+    if (touch.active) { turn = deadzone(-touch.x); move = deadzone(-touch.y); }
+    const actionReq = P.takeoffReq; P.takeoffReq = false;
+
+    // turning is slower at full sprint, like a real animal leaning into a wide arc
+    const speedFrac = Math.min(1, Math.abs(d.speedNow) / cfg.run);
+    d.yaw += turn * cfg.turn * (1 - 0.45 * speedFrac) * dt;
+    const want = move > 0.15 ? cfg.run * move : move < -0.15 ? cfg.back * move : 0;
+    d.speedNow = damp(d.speedNow, want, want === 0 ? 4 : 2.2, dt);
+    forward.set(Math.sin(d.yaw), 0, Math.cos(d.yaw));
+    const nx = clamp(d.x + forward.x * d.speedNow * dt, -HALF + 30, HALF - 30), nz = clamp(d.z + forward.z * d.speedNow * dt, -HALF + 30, HALF - 30);
+    const nh = terrainH(nx, nz);
+    if (nh > cfg.minH && nh < 60) { d.x = nx; d.z = nz; } else d.speedNow = 0;
+    d.phase += Math.abs(d.speedNow) * d.stride * dt;
+
+    d.lungeCd = Math.max(0, d.lungeCd - dt);
+    if (actionReq && d.lungeT <= 0 && d.lungeCd <= 0) {
+      d.lungeT = 1.0; d.lungeCd = 0.9; d.snapped = false;
+      if (cfg.scare) { d.roarT = 1.6; scareHerds(cfg.scare); shake = 0.5; }
+    }
+    tickLunge(d, dt);
+    d.aim = 0.35;
+    animateDino(d, dt, t, true);
+
+    const gh = terrainH(d.x, d.z);
+    P.x = d.x; P.z = d.z; P.y = gh + 2; P.yaw = d.yaw; P.speed = Math.abs(d.speedNow);
+    takeoffBtn.classList.add('show');
+    modeHint.classList.remove('show');
+
+    const back = cfg.camBack, height = cfg.camH;
+    camTarget.set(d.x - forward.x * back, gh + height, d.z - forward.z * back);
+    camLook.set(d.x + forward.x * 6, gh + cfg.lookH, d.z + forward.z * 6);
+    if (!camInit) { camera.position.copy(camTarget); camLookCur.copy(camLook); camInit = true; }
+    camera.position.lerp(camTarget, 1 - Math.exp(-4.5 * dt));
+    camLookCur.lerp(camLook, 1 - Math.exp(-6 * dt));
+    shake = damp(shake, 0, 5, dt);
+    if (shake > 0.01) camera.position.add(_p.set((Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake, (Math.random() - 0.5) * shake).multiplyScalar(1.4));
+    camera.lookAt(camLookCur);
+  }
+
+  // ---------------------------------------------------------------------------
   // HUD
   // ---------------------------------------------------------------------------
   const altEl = document.getElementById('alt'), spdEl = document.getElementById('spd'), nearEl = document.getElementById('near');
@@ -1445,10 +1631,10 @@
     for (const d of dinos) { const dd = Math.hypot(d.x - P.x, d.z - P.z); if (dd < bd) { bd = dd; best = d; } if (d.hunt > 0 && (!hunter || dd < hunter.dd)) hunter = { d, dd }; }
     let bestF = null, bf = 1e9;
     for (const m of flyers) { const dd = Math.hypot(m.x - P.x, m.y - P.y, m.z - P.z); if (dd < bf) { bf = dd; bestF = m; } }
-    const lines = [];
+    const lines = [], onGround = player.kind !== 'quetz';
     if (hunter) lines.push('<span style="color:#ffb3a0">&#9888; ' + hunter.d.name + ' is hunting you</span>');
-    else if (best && bd < 90) lines.push('Below: ' + best.name);
-    if (bestF && bf < 70) lines.push('Alongside: ' + bestF.model.name);
+    else if (best && bd < (onGround ? 60 : 90)) lines.push((onGround ? 'Nearby: ' : 'Below: ') + best.name);
+    if (bestF && bf < 70) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + bestF.model.name);
     nearEl.innerHTML = lines.join('<br>');
   }
 
@@ -1464,7 +1650,7 @@
     elapsed += dt;
     fpsCount++; fpsTime += raw; if (fpsTime >= 1) { fps = fpsCount / fpsTime; fpsCount = 0; fpsTime = 0; window.__game && (window.__game.fps = fps); }
 
-    updatePlayer(dt);
+    if (player.kind === 'quetz') updatePlayer(dt); else updateGroundPlayer(dt, elapsed);
     for (const d of dinos) updateDino(d, dt, elapsed);
     updateFlyers(dt, elapsed);
 
@@ -1487,7 +1673,9 @@
   });
 
   document.getElementById('loading').style.display = 'none';
-  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer };
+  selectCharacter('quetz');
+  showSelect(true);
+  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter };
   frame();
 })();
 </script>

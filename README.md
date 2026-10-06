@@ -14,11 +14,21 @@ A small open-world flying game for the browser. You are a Quetzalcoatlus soaring
 
 **Play it:** https://quetzalcoatlus-skies.nishant-pateluk.workers.dev
 
+## Playable dinosaurs
+
+Pick one on the start screen, or switch at any time with the **Switch dinosaur** button, the **1 / 2 / 3** keys, or **Esc** to reopen the menu.
+
+| | Quetzalcoatlus | Tyrannosaurus rex | Velociraptor |
+| --- | --- | --- | --- |
+| Moves | Flies, lands, walks on all fours | Runs up to 29 km/h | Sprints up to 50 km/h |
+| Space | Take off | Roar and bite; nearby herds scatter | Leap and bite |
+| Hunted by | All carnivores when flying low | Nothing | T. rex, Allosaurus, Spinosaurus |
+
 ## Controls
 
-| Platform | Turn | Climb (flap harder) | Dive (glide) |
+| Platform | Turn | Up | Down |
 | --- | --- | --- | --- |
-| Keyboard | Left / Right arrows (or A / D) | Up arrow (or W) | Down arrow (or S) |
+| Keyboard | Left / Right arrows (or A / D) | Climb, or run on the ground (Up arrow / W) | Dive, or back up on the ground (Down arrow / S) |
 | Touch | Drag the on-screen pad left / right | Drag up | Drag down |
 
 **Landing and walking.** Fly low over land and the Quetzalcoatlus flares, slows and touches down on its hind feet. On the ground it walks the way the real animal did: on all fours, with the folded wings planted as forelimbs and the long neck held upright. Up walks, Down backs up, Left / Right turn. You cannot land on water.
