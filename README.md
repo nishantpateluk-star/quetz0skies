@@ -20,13 +20,13 @@ Three tour jeeps in the classic sand-and-red livery carry tourists around the pl
 
 ## Playable dinosaurs
 
-Pick one on the start screen, or switch at any time with the **Switch dinosaur** button, the **1 / 2 / 3** keys, or **Esc** to reopen the menu.
+Pick one on the start screen, or switch at any time with the **Switch dinosaur** button, the **1 to 4** keys, or **Esc** to reopen the menu.
 
-| | Quetzalcoatlus | Tyrannosaurus rex | Velociraptor |
-| --- | --- | --- | --- |
-| Moves | Flies, lands, walks on all fours | Runs up to 29 km/h | Sprints up to 50 km/h |
-| Space | Take off | Roar and bite; nearby herds scatter | Leap and bite |
-| Hunted by | All carnivores when flying low | Nothing | T. rex, Allosaurus, Spinosaurus |
+| | Quetzalcoatlus | Tyrannosaurus rex | Spinosaurus | Velociraptor |
+| --- | --- | --- | --- | --- |
+| Moves | Flies, lands, walks on all fours | Runs up to 29 km/h | Runs up to 27 km/h and wades through the lakes | Sprints up to 50 km/h |
+| Space | Take off | Roar and bite; nearby herds scatter | Roar and bite; nearby herds scatter | Leap and bite |
+| Hunted by | All carnivores when flying low | Nothing | Nothing | T. rex, Allosaurus, Spinosaurus |
 
 ## Controls
 

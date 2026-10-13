@@ -71,7 +71,7 @@
 </div>
 <div id="select">
   <h2>Choose your dinosaur</h2>
-  <p class="lead">You can switch at any time with the button in the corner or the 1, 2, 3 keys.</p>
+  <p class="lead">You can switch at any time with the button in the corner or the 1 to 4 keys.</p>
   <div class="cards">
     <div class="card" data-kind="quetz">
       <div class="icon">&#x1F985;</div>
@@ -85,6 +85,13 @@
       <h3>Tyrannosaurus rex</h3>
       <div class="role">Apex predator &middot; ground</div>
       <p>Twelve metres of muscle. Nothing hunts you. Roar to scatter the herds and snap at anything that gets close.</p>
+      <div class="keys"><b>&uarr;</b> run <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> roar / bite</div>
+    </div>
+    <div class="card" data-kind="spino">
+      <div class="icon">&#x1F40A;</div>
+      <h3>Spinosaurus</h3>
+      <div class="role">Sail-backed river hunter &middot; ground &amp; water</div>
+      <p>Longer than a T. rex and at home in the water. Wade through the lakes, roar to scatter the herds. Nothing hunts you.</p>
       <div class="keys"><b>&uarr;</b> run <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> roar / bite</div>
     </div>
     <div class="card" data-kind="raptor">
@@ -1671,6 +1678,9 @@
     trex: { name: 'Tyrannosaurus rex', build: buildTRex, run: 8.0, back: 1.6, turn: 1.0, camBack: 24, camH: 9.5, lookH: 6, minH: -0.8, hop: 0.5, rear: 0.35, action: 'Roar', scare: 55,
       controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Roar near the herds and watch them scatter.</div>',
       touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
+    spino: { name: 'Spinosaurus', build: buildSpino, run: 7.5, back: 1.5, turn: 0.95, camBack: 23, camH: 8.5, lookH: 5, minH: -2.6, hop: 0.6, rear: 0.35, action: 'Roar', scare: 50,
+      controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Wade right into the lakes. Roar to scatter the herds.</div>',
+      touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
     raptor: { name: 'Velociraptor', build: buildRaptor, run: 14.0, back: 2.5, turn: 2.2, camBack: 9, camH: 3.4, lookH: 1.8, minH: 0.6, hop: 3.8, rear: 0.5, action: 'Leap', scare: 0,
       controls: '<div><b>&uarr;</b> sprint</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> leap / bite</div><div style="opacity:.8;margin-top:4px">The big carnivores will still hunt you. Stay quick.</div>',
       touch: 'Drag the pad: up sprints, down backs up, sides turn. Tap Leap to jump.' },
@@ -1724,7 +1734,8 @@
     if (e.code === 'Escape') showSelect(!selectEl.classList.contains('show'));
     if (e.code === 'Digit1') { selectCharacter('quetz'); showSelect(false); }
     if (e.code === 'Digit2') { selectCharacter('trex'); showSelect(false); }
-    if (e.code === 'Digit3') { selectCharacter('raptor'); showSelect(false); }
+    if (e.code === 'Digit3') { selectCharacter('spino'); showSelect(false); }
+    if (e.code === 'Digit4') { selectCharacter('raptor'); showSelect(false); }
   });
 
   // T. rex roar: nearby plant-eaters bolt
