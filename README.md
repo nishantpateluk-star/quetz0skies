@@ -14,6 +14,10 @@ A small open-world flying game for the browser. You are a Quetzalcoatlus soaring
 
 **Play it:** https://quetzalcoatlus-skies.nishant-pateluk.workers.dev
 
+## Bonus sights
+
+Three tour jeeps in the classic sand-and-red livery carry tourists around the plains, steering their own way around lakes and hills. A striped hot air balloon drifts high above the island with its burner flaring. The wildlife pays neither of them any attention.
+
 ## Playable dinosaurs
 
 Pick one on the start screen, or switch at any time with the **Switch dinosaur** button, the **1 / 2 / 3** keys, or **Esc** to reopen the menu.

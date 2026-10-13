@@ -1110,6 +1110,169 @@
   addFlock('quetz', 320, -320, 82, 160, 1);
   addFlock('quetz', -360, 380, 70, 140, 1);
 
+  // ---------------------------------------------------------------------------
+  // Bonus: tour jeeps and a hot air balloon (no interaction with the wildlife)
+  // ---------------------------------------------------------------------------
+  const vehicleMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.15 });
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x9fd3ea, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.45 });
+  const flatPal = { top: 0xffffff, belly: 0xffffff, yBelly: 0, yTop: 1 };
+  function flatMesh(parts, material) {
+    const m = new THREE.Mesh(merge(parts.map(p => paint(p[0], flatPal, p[1]))), material || vehicleMat);
+    m.castShadow = true;
+    return m;
+  }
+  function wheelGeo(r, w) { const g = new THREE.CylinderGeometry(r, r, w, 14); g.rotateZ(Math.PI / 2); return g; }
+  function tourist(x, y, z, shirt, hat, standing) {
+    const parts = [
+      [place(new THREE.BoxGeometry(0.42, standing ? 0.7 : 0.5, 0.28), x, y + (standing ? 0.35 : 0.25), z), shirt],
+      [place(ell(0.15, 0.17, 0.15, 10), x, y + (standing ? 0.9 : 0.68), z), 0xe8b894],
+      [place(new THREE.CylinderGeometry(0.12, 0.13, 0.1, 10), x, y + (standing ? 1.02 : 0.8), z), hat],
+      [place(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 12), x, y + (standing ? 0.96 : 0.74), z), hat],
+    ];
+    if (standing) parts.push([place(new THREE.BoxGeometry(0.12, 0.5, 0.12), x + 0.32, y + 0.75, z, 0, 0, -0.5), shirt]);   // waving arm
+    return parts;
+  }
+  function buildJeep(number) {
+    const g = new THREE.Group();
+    const SAND = 0xd8bf7a, RED = 0xc0392b, DARK = 0x2b2b2b, GREY = 0x8a8a8a;
+    const body = flatMesh([
+      [place(new THREE.BoxGeometry(1.9, 0.62, 4.2), 0, 0.96, 0), SAND],                      // tub
+      [place(new THREE.BoxGeometry(1.8, 0.26, 1.5), 0, 1.38, 1.3), SAND],                     // bonnet
+      [place(new THREE.BoxGeometry(1.5, 0.22, 0.5), 0, 0.72, 2.3), DARK],                     // bull bar
+      [place(new THREE.BoxGeometry(0.03, 0.2, 2.7), 0.96, 1.05, -0.3), RED], [place(new THREE.BoxGeometry(0.03, 0.2, 2.7), -0.96, 1.05, -0.3), RED],   // side stripes
+      [place(new THREE.BoxGeometry(0.03, 0.06, 2.7), 0.96, 0.9, -0.3), DARK], [place(new THREE.BoxGeometry(0.03, 0.06, 2.7), -0.96, 0.9, -0.3), DARK],
+      [place(new THREE.BoxGeometry(1.9, 0.2, 0.03), 0, 1.05, -2.1), RED],
+      [place(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 10), 0.6, 1.2, 2.11, Math.PI / 2, 0, 0), 0xfff2b0], [place(new THREE.CylinderGeometry(0.11, 0.11, 0.06, 10), -0.6, 1.2, 2.11, Math.PI / 2, 0, 0), 0xfff2b0],   // headlights
+      [place(new THREE.BoxGeometry(1.7, 0.1, 0.8), 0, 1.3, 0.3), 0x6b4a2a], [place(new THREE.BoxGeometry(1.7, 0.1, 0.8), 0, 1.3, -0.8), 0x6b4a2a],   // seats
+      [place(new THREE.BoxGeometry(1.7, 0.45, 0.1), 0, 1.5, -0.1), 0x6b4a2a], [place(new THREE.BoxGeometry(1.7, 0.45, 0.1), 0, 1.5, -1.2), 0x6b4a2a],   // seat backs
+      [place(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 8), 0.85, 1.75, -0.3), DARK], [place(new THREE.CylinderGeometry(0.05, 0.05, 1.0, 8), -0.85, 1.75, -0.3), DARK],   // roll cage
+      [place(new THREE.CylinderGeometry(0.05, 0.05, 1.8, 8), 0, 2.25, -0.3, 0, 0, Math.PI / 2), DARK],
+      [place(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 8), 0.85, 2.2, 0.4, Math.PI / 2 + 0.15, 0, 0), DARK], [place(new THREE.CylinderGeometry(0.05, 0.05, 1.4, 8), -0.85, 2.2, 0.4, Math.PI / 2 + 0.15, 0, 0), DARK],
+      [place(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8), 0, 1.7, 1.05, -0.25, 0, 0), DARK],                   // windscreen frame post (centre)
+      [place(wheelGeo(0.42, 0.26), 0, 1.45, -2.25, 0, Math.PI / 2, 0), DARK], [place(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 10), 0, 1.45, -2.25, Math.PI / 2, 0, 0), GREY],   // spare wheel
+      [place(new THREE.BoxGeometry(0.5, 0.3, 0.02), 0.97, 1.05, 0.9), 0xfff5d6], [place(new THREE.BoxGeometry(0.5, 0.3, 0.02), -0.97, 1.05, 0.9), 0xfff5d6],   // number plates
+      ...tourist(-0.45, 1.25, 0.3, 0x3b6fb6, 0xd9c7a0, false), ...tourist(0.45, 1.25, 0.3, 0xd9534f, 0x6b4a2a, false),
+      ...tourist(-0.45, 1.25, -0.8, 0x5cb85c, 0xf5f0e0, false), ...tourist(0.45, 1.25, -0.8, 0xf0ad4e, 0x333333, false),
+    ]);
+    g.add(body);
+    const glass = new THREE.Mesh(place(new THREE.BoxGeometry(1.7, 0.62, 0.05), 0, 1.72, 1.02, -0.25, 0, 0), glassMat);
+    g.add(glass);
+    const wheels = [], pivots = [];
+    for (const [x, z, front] of [[0.95, 1.45, true], [-0.95, 1.45, true], [0.95, -1.4, false], [-0.95, -1.4, false]]) {
+      const pivot = new THREE.Group(); pivot.position.set(x, 0.45, z); g.add(pivot);
+      const w = flatMesh([[wheelGeo(0.45, 0.32), DARK], [place(new THREE.CylinderGeometry(0.17, 0.17, 0.34, 10), 0, 0, 0, 0, 0, Math.PI / 2), GREY]]);
+      pivot.add(w); wheels.push(w); if (front) pivots.push(pivot);
+    }
+    g.rotation.order = 'YXZ';
+    return { group: g, wheels, pivots, body };
+  }
+  const jeeps = [];
+  function jeepSpot(cx, cz, radius) {
+    for (let i = 0; i < 40; i++) {
+      const a = rand(0, TAU), r = rand(radius * 0.3, radius);
+      const x = clamp(cx + Math.cos(a) * r, -520, 520), z = clamp(cz + Math.sin(a) * r, -520, 520);
+      const h = terrainH(x, z);
+      if (h < 2.5 || h > 22 || nearestLakeDist(x, z) < 18) continue;
+      return { x, z };
+    }
+    return null;
+  }
+  function clearRoute(x0, z0, x1, z1) {
+    for (let s = 0.1; s < 1; s += 0.1) { const h = terrainH(lerp(x0, x1, s), lerp(z0, z1, s)); if (h < 1.8 || h > 26) return false; }
+    return true;
+  }
+  for (let i = 0; i < 3; i++) {
+    const s = landSpot(3, 18, 430, 120, (x, z) => nearestLakeDist(x, z) > 30) || { x: 100 * i, z: -100 };
+    const model = buildJeep(i + 1);
+    model.group.position.set(s.x, terrainH(s.x, s.z), s.z);
+    scene.add(model.group);
+    jeeps.push({ model, x: s.x, z: s.z, yaw: rand(0, TAU), speed: 0, maxSpeed: 9 + i * 0.8, target: null, wait: rand(0, 3), home: { x: s.x, z: s.z }, wheelRot: 0 });
+  }
+  function updateJeeps(dt) {
+    for (const j of jeeps) {
+      if (!j.target) {
+        j.wait -= dt; j.speed = damp(j.speed, 0, 3, dt);
+        if (j.wait <= 0) {
+          for (let i = 0; i < 15 && !j.target; i++) { const t = jeepSpot(j.home.x, j.home.z, 260); if (t && clearRoute(j.x, j.z, t.x, t.z)) j.target = t; }
+          if (!j.target) j.wait = 1;
+        }
+      } else {
+        const dx = j.target.x - j.x, dz = j.target.z - j.z, dist = Math.hypot(dx, dz);
+        const want = Math.atan2(dx, dz);
+        let diff = ((want - j.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
+        j.yaw = angleLerp(j.yaw, want, 1 - Math.exp(-1.4 * dt));
+        const corner = Math.min(1, Math.abs(diff) / 0.9);
+        const targetSpeed = dist < 12 ? Math.max(2, j.maxSpeed * dist / 12) : j.maxSpeed * (1 - 0.6 * corner);
+        j.speed = damp(j.speed, targetSpeed, 1.6, dt);
+        const nx = j.x + Math.sin(j.yaw) * j.speed * dt, nz = j.z + Math.cos(j.yaw) * j.speed * dt;
+        const nh = terrainH(nx, nz);
+        if (nh < 1.8 || nh > 28) { j.target = null; j.wait = 1.5; j.speed = 0; }
+        else { j.x = nx; j.z = nz; }
+        if (dist < 4) { j.target = null; j.wait = rand(2, 8); }
+        for (const p of j.model.pivots) p.rotation.y = damp(p.rotation.y, clamp(diff, -0.45, 0.45), 6, dt);
+      }
+      j.wheelRot += j.speed / 0.45 * dt;
+      for (const w of j.model.wheels) w.rotation.x = j.wheelRot;
+      // sit the chassis on the slope
+      const sx = Math.sin(j.yaw), cz = Math.cos(j.yaw);
+      const hF = terrainH(j.x + sx * 2, j.z + cz * 2), hB = terrainH(j.x - sx * 2, j.z - cz * 2);
+      const hL = terrainH(j.x + cz * 1, j.z - sx * 1), hR = terrainH(j.x - cz * 1, j.z + sx * 1);
+      const g = j.model.group;
+      g.position.set(j.x, (hF + hB) / 2, j.z);
+      g.rotation.set(-Math.atan2(hF - hB, 4), j.yaw, Math.atan2(hL - hR, 2));
+      j.model.body.position.y = Math.sin(j.wheelRot * 0.7) * 0.015 * Math.min(1, j.speed / 4);
+    }
+  }
+
+  function buildBalloon() {
+    const g = new THREE.Group();
+    const env = new THREE.SphereGeometry(7, 28, 18); env.scale(1, 1.18, 1); env.translate(0, 15.2, 0);
+    const stripes = [new THREE.Color(0xd63a2f), new THREE.Color(0xf4c542), new THREE.Color(0x2f6fd6), new THREE.Color(0xf3efe4)];
+    const ep = env.attributes.position, ec = new Float32Array(ep.count * 3);
+    for (let i = 0; i < ep.count; i++) {
+      const sector = Math.floor(((Math.atan2(ep.getZ(i), ep.getX(i)) + Math.PI) / TAU) * 16 + 0.0001) % 4;
+      const shade = 0.85 + 0.15 * clamp((ep.getY(i) - 8) / 16, 0, 1);
+      const c = stripes[sector]; ec[i * 3] = c.r * shade; ec[i * 3 + 1] = c.g * shade; ec[i * 3 + 2] = c.b * shade;
+    }
+    env.setAttribute('color', new THREE.BufferAttribute(ec, 3));
+    const envelope = new THREE.Mesh(env, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7 })); envelope.castShadow = true; g.add(envelope);
+    const parts = [
+      [place(new THREE.CylinderGeometry(3.3, 1.0, 3.4, 20, 1, true), 0, 5.2, 0), 0x8f2a22],                       // skirt / neck
+      [place(new THREE.BoxGeometry(2.3, 1.5, 2.3), 0, 0.85, 0), 0x9a6a3a], [place(new THREE.BoxGeometry(2.4, 0.12, 2.4), 0, 1.62, 0), 0x6b4a2a],   // basket + rim
+      [place(new THREE.BoxGeometry(0.7, 0.5, 0.7), 0, 3.2, 0), 0x444444],                                          // burner
+      ...tourist(-0.5, 1.6, 0.2, 0x3b6fb6, 0xd9c7a0, true), ...tourist(0.5, 1.6, -0.3, 0xd9534f, 0xf5f0e0, true),
+    ];
+    for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
+      const from = new THREE.Vector3(x * 1.1, 1.6, z * 1.1), to = new THREE.Vector3(x * 0.9, 3.9, z * 0.9);
+      const dir = to.clone().sub(from), len = dir.length();
+      const rope = new THREE.CylinderGeometry(0.03, 0.03, len, 5);
+      rope.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize()));
+      rope.translate((from.x + to.x) / 2, (from.y + to.y) / 2, (from.z + to.z) / 2);
+      parts.push([rope, 0x5a4632]);
+    }
+    g.add(flatMesh(parts, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85, side: THREE.DoubleSide })));
+    const flame = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.4, 8), new THREE.MeshBasicMaterial({ color: 0xffa826, transparent: true, opacity: 0.9 }));
+    flame.position.set(0, 4.2, 0); g.add(flame);
+    const glow = new THREE.PointLight(0xffa040, 0, 25); glow.position.set(0, 4.6, 0); g.add(glow);
+    return { group: g, flame, glow };
+  }
+  const balloon = Object.assign(buildBalloon(), { angle: rand(0, TAU), radius: 360, alt: 125, seed: rand(0, 100) });
+  scene.add(balloon.group);
+  function updateBalloon(dt, t) {
+    const b = balloon;
+    b.angle += 3.2 / b.radius * dt;
+    const wobble = Math.sin(t * 0.07 + b.seed) * 40;
+    const x = Math.cos(b.angle) * (b.radius + wobble), z = Math.sin(b.angle) * (b.radius - wobble);
+    const y = b.alt + Math.sin(t * 0.11 + b.seed) * 9 + Math.sin(t * 0.37) * 1.2;
+    b.group.position.set(x, Math.max(y, terrainH(x, z) + 60), z);
+    b.group.rotation.y += 0.04 * dt;
+    b.group.rotation.z = Math.sin(t * 0.3 + b.seed) * 0.02;
+    const burning = Math.sin(t * 0.45 + b.seed) > 0.72;
+    const flick = burning ? 0.7 + Math.random() * 0.6 : 0;
+    b.flame.scale.set(flick, flick, flick); b.flame.visible = burning;
+    b.glow.intensity = burning ? 40 + Math.random() * 30 : 0;
+  }
+
   function animateWings(model, flap, flapOuter) {
     for (const w of model.wings) { w.inner.rotation.z = flap; w.outer.rotation.z = flapOuter; }
   }
@@ -1632,9 +1795,13 @@
     let bestF = null, bf = 1e9;
     for (const m of flyers) { const dd = Math.hypot(m.x - P.x, m.y - P.y, m.z - P.z); if (dd < bf) { bf = dd; bestF = m; } }
     const lines = [], onGround = player.kind !== 'quetz';
+    let jd = 1e9; for (const j of jeeps) jd = Math.min(jd, Math.hypot(j.x - P.x, j.z - P.z));
+    const bdist = Math.hypot(balloon.group.position.x - P.x, balloon.group.position.y - P.y, balloon.group.position.z - P.z);
     if (hunter) lines.push('<span style="color:#ffb3a0">&#9888; ' + hunter.d.name + ' is hunting you</span>');
+    else if (jd < 45 && jd < bd) lines.push((onGround ? 'Nearby: ' : 'Below: ') + 'Tour jeep');
     else if (best && bd < (onGround ? 60 : 90)) lines.push((onGround ? 'Nearby: ' : 'Below: ') + best.name);
-    if (bestF && bf < 70) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + bestF.model.name);
+    if (bdist < 80) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + 'Hot air balloon');
+    else if (bestF && bf < 70) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + bestF.model.name);
     nearEl.innerHTML = lines.join('<br>');
   }
 
@@ -1653,6 +1820,8 @@
     if (player.kind === 'quetz') updatePlayer(dt); else updateGroundPlayer(dt, elapsed);
     for (const d of dinos) updateDino(d, dt, elapsed);
     updateFlyers(dt, elapsed);
+    updateJeeps(dt);
+    updateBalloon(dt, elapsed);
 
     for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > HALF * 1.4) c.position.x = -HALF * 1.4; }
     waterNormal.offset.x += dt * 0.012; waterNormal.offset.y += dt * 0.008;
@@ -1675,7 +1844,7 @@
   document.getElementById('loading').style.display = 'none';
   selectCharacter('quetz');
   showSelect(true);
-  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter };
+  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter, jeeps, balloon };
   frame();
 })();
 </script>
