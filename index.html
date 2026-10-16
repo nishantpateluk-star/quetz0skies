@@ -16,6 +16,7 @@
   #controls b { display: inline-block; min-width: 42px; background: rgba(255,255,255,.18); border-radius: 4px; padding: 0 6px; text-align: center; margin-right: 6px; font-weight: 600; }
   #stats { position: absolute; right: 16px; top: 14px; color: #fff; font-size: 14px; text-align: right; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: rgba(0,0,0,.25); padding: 8px 12px; border-radius: 8px; line-height: 1.6; pointer-events: none; }
   #alert { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); color: #fff; font-size: 26px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.8), 0 0 18px rgba(255,80,40,.6); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
+  #vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(10,14,20,.28) 100%); }
   #flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px rgba(210,40,25,0); transition: box-shadow .18s; }
   #dpad { position: absolute; right: 26px; bottom: 26px; width: 176px; height: 176px; border-radius: 50%; display: none; touch-action: none;
           background: radial-gradient(circle, rgba(255,255,255,.28) 0%, rgba(255,255,255,.14) 68%, rgba(255,255,255,0) 70%); box-shadow: 0 0 0 2px rgba(255,255,255,.25) inset; }
@@ -54,6 +55,7 @@
 <body>
 <div id="loading">Growing the Cretaceous&hellip;</div>
 <div id="err"></div>
+<div id="vignette"></div>
 <div id="flash"></div>
 <div id="hud">
   <h1 id="title">Quetzalcoatlus</h1>
@@ -188,6 +190,16 @@
     for (const L of LAKES) { const d = Math.hypot(x - L.x, z - L.z) - L.r; if (d < best) best = d; }
     return best;
   }
+  // Height of the rendered terrain mesh (linear across its triangles), which can differ from terrainH by up to
+  // half a metre between vertices. Small props use this so they sit exactly on the visible ground.
+  const TERRAIN = { SEG: (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 180 : 240, heights: null };
+  function meshH(x, z) {
+    const S = TERRAIN.SEG, cell = HALF * 2 / S, hs = TERRAIN.heights;
+    const gx = clamp((x + HALF) / cell, 0, S - 1e-4), gz = clamp((z + HALF) / cell, 0, S - 1e-4);
+    const ix = Math.floor(gx), iz = Math.floor(gz), fx = gx - ix, fz = gz - iz, W = S + 1;
+    const ha = hs[iz * W + ix], hb = hs[(iz + 1) * W + ix], hc = hs[(iz + 1) * W + ix + 1], hd = hs[iz * W + ix + 1];
+    return fx + fz <= 1 ? ha + (hd - ha) * fx + (hb - ha) * fz : hc + (hb - hc) * (1 - fx) + (hd - hc) * (1 - fz);
+  }
 
   // ---------------------------------------------------------------------------
   // Procedural textures (canvas)
@@ -220,10 +232,81 @@
     ctx.fillStyle = '#6a4a30'; ctx.fillRect(0, 0, s, s);
     for (let i = 0; i < 1400; i++) { const v = rand(45, 130); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(2, 6), rand(20, 90), rand(-0.08, 0.08), `rgba(${v | 0},${(v * 0.72) | 0},${(v * 0.5) | 0},${rand(0.3, 0.7)})`); }
   }, { srgb: true });
+  // foliage: dark gaps between layered leaf clusters, so canopies read as depth rather than a painted shell
   const leafTex = makeTex(256, (ctx, s) => {
-    ctx.fillStyle = '#c4ccb0'; ctx.fillRect(0, 0, s, s);
-    for (let i = 0; i < 2600; i++) { const g = rand(120, 240); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(4, 11), rand(3, 7), rand(0, Math.PI), `rgba(${(g * 0.75) | 0},${g | 0},${(g * 0.55) | 0},${rand(0.35, 0.8)})`); }
+    ctx.fillStyle = '#3c4a2c'; ctx.fillRect(0, 0, s, s);
+    for (let layer = 0; layer < 3; layer++) {
+      for (let i = 0; i < 1500; i++) {
+        const g = rand(110, 170) + layer * 35;
+        tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(3, 8), rand(2, 5), rand(0, Math.PI), `rgba(${(g * 0.78) | 0},${g | 0},${(g * 0.5) | 0},${rand(0.5, 0.9)})`);
+      }
+    }
   }, { srgb: true });
+  // tileable value-noise (periodic lattice) used to break up texture repetition across the landscape
+  const noiseTex = makeTex(256, (ctx, s) => {
+    const img = ctx.createImageData(s, s), d = img.data;
+    const pn = (x, y, P) => {
+      const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy, ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+      const h = (a, b) => hash(((a % P) + P) % P, ((b % P) + P) % P);
+      return (h(ix, iy) * (1 - ux) + h(ix + 1, iy) * ux) * (1 - uy) + (h(ix, iy + 1) * (1 - ux) + h(ix + 1, iy + 1) * ux) * uy;
+    };
+    for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+      let v = 0, a = 0.5, f = 4, sum = 0;
+      for (let o = 0; o < 5; o++) { v += a * pn(x / s * f, y / s * f, f); sum += a; a *= 0.5; f *= 2; }
+      const i = (y * s + x) * 4; d[i] = d[i + 1] = d[i + 2] = (v / sum) * 255; d[i + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  });
+  // mean linear colour of a canvas texture, so detail textures can be normalised to average 1.0 in the shader
+  function texMean(tex) {
+    const c = tex.image, d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    const lin = v => { v /= 255; return v <= 0.04045 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); };
+    let r = 0, g = 0, b = 0, n = 0;
+    for (let i = 0; i < d.length; i += 16) { r += lin(d[i]); g += lin(d[i + 1]); b += lin(d[i + 2]); n++; }
+    return new THREE.Vector3(r / n, g / n, b / n);
+  }
+  // Cretaceous ground cover: fern fronds and horsetail clumps drawn as alpha cut-outs
+  const fernTex = makeTex(256, (ctx, s) => {
+    ctx.clearRect(0, 0, s, s);
+    ctx.lineCap = 'round';
+    const fronds = 9;
+    for (let f = 0; f < fronds; f++) {
+      const a = -Math.PI / 2 + (f / (fronds - 1) - 0.5) * 2.3 + rand(-0.1, 0.1);
+      const len = s * rand(0.62, 0.9), bend = rand(0.25, 0.5) * Math.sign(Math.cos(a) || 1);
+      let px = s / 2, py = s, ang = a;
+      const steps = 22, g = rand(150, 215);
+      for (let i = 0; i < steps; i++) {
+        const k = i / steps, seg = len / steps;
+        ang += bend * 0.06 * k;   // fronds arch outward and droop at the tips
+        const nx = px + Math.cos(ang) * seg, ny = py + Math.sin(ang) * seg;
+        ctx.strokeStyle = `rgb(${(g * 0.62) | 0},${(g * 0.78) | 0},${(g * 0.4) | 0})`; ctx.lineWidth = 2.2 * (1 - k) + 0.6;
+        ctx.beginPath(); ctx.moveTo(px, py); ctx.lineTo(nx, ny); ctx.stroke();
+        if (i > 2) {
+          const leaf = (1 - k) * 15 + 3;
+          for (const side of [1, -1]) {
+            const la = ang + side * 1.15;
+            ctx.strokeStyle = `rgb(${(g * rand(0.7, 0.8)) | 0},${g | 0},${(g * rand(0.42, 0.52)) | 0})`; ctx.lineWidth = 3.2 * (1 - k * 0.6);
+            ctx.beginPath(); ctx.moveTo(nx, ny); ctx.lineTo(nx + Math.cos(la) * leaf, ny + Math.sin(la) * leaf); ctx.stroke();
+          }
+        }
+        px = nx; py = ny;
+      }
+    }
+  }, { clamp: true, srgb: true });
+  const horsetailTex = makeTex(128, (ctx, s) => {
+    ctx.clearRect(0, 0, s, s);
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 16; i++) {
+      const x0 = s / 2 + rand(-s * 0.3, s * 0.3), top = rand(s * 0.02, s * 0.35), lean = rand(-12, 12), g = rand(140, 200);
+      ctx.strokeStyle = `rgb(${(g * 0.7) | 0},${(g * 0.82) | 0},${(g * 0.45) | 0})`; ctx.lineWidth = rand(1.6, 2.6);
+      ctx.beginPath(); ctx.moveTo(x0, s); ctx.quadraticCurveTo(x0 + lean * 0.3, (s + top) / 2, x0 + lean, top); ctx.stroke();
+      ctx.lineWidth = 0.9;
+      for (let y = s - 8; y > top + 4; y -= 7) {
+        const k = (s - y) / (s - top), x = x0 + lean * k * k;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 5, y + 4); ctx.moveTo(x, y); ctx.lineTo(x + 5, y + 4); ctx.stroke();
+      }
+    }
+  }, { clamp: true, srgb: true });
   const rockTex = makeTex(256, (ctx, s) => {
     ctx.fillStyle = '#bcb8b2'; ctx.fillRect(0, 0, s, s);
     for (let i = 0; i < 3000; i++) { const v = rand(110, 230); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(2, 9), rand(2, 9), rand(0, Math.PI), `rgba(${v | 0},${(v * 0.97) | 0},${(v * 0.94) | 0},${rand(0.25, 0.6)})`); }
@@ -250,12 +333,18 @@
   });
   const cloudTex = makeTex(256, (ctx, s) => {
     ctx.clearRect(0, 0, s, s);
-    for (let i = 0; i < 16; i++) {
-      const x = s / 2 + rand(-s * 0.28, s * 0.28), y = s / 2 + rand(-s * 0.1, s * 0.16), r = rand(s * 0.12, s * 0.27);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, r);
-      g.addColorStop(0, 'rgba(255,255,255,0.55)'); g.addColorStop(0.6, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    // cauliflower billows, brighter on their sunlit upper-left, then a grey shaded flat base
+    for (let i = 0; i < 26; i++) {
+      const x = s / 2 + rand(-s * 0.3, s * 0.3), y = s / 2 + rand(-s * 0.14, s * 0.12) + Math.abs(x - s / 2) * 0.25, r = rand(s * 0.08, s * 0.22);
+      const g = ctx.createRadialGradient(x - r * 0.25, y - r * 0.3, 0, x, y, r);
+      g.addColorStop(0, 'rgba(255,255,255,0.75)'); g.addColorStop(0.55, 'rgba(242,245,250,0.45)'); g.addColorStop(1, 'rgba(230,236,245,0)');
       ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
     }
+    ctx.globalCompositeOperation = 'source-atop';
+    const shade = ctx.createLinearGradient(0, s * 0.3, 0, s * 0.72);
+    shade.addColorStop(0, 'rgba(150,160,180,0)'); shade.addColorStop(1, 'rgba(128,138,158,0.75)');
+    ctx.fillStyle = shade; ctx.fillRect(0, 0, s, s);
+    ctx.globalCompositeOperation = 'source-over';
   }, { clamp: true, srgb: true });
 
   // ---------------------------------------------------------------------------
@@ -267,39 +356,52 @@
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.08;
+  renderer.toneMappingExposure = 0.95;
   document.body.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  const HORIZON = new THREE.Color(0xd3e2f1);
-  scene.fog = new THREE.Fog(HORIZON, 320, 1500);
+  // horizon haze; the fog uses the same colour so distant hills melt into the sky (aerial perspective)
+  const HORIZON = new THREE.Color(0xc4d3df);
+  scene.fog = new THREE.FogExp2(HORIZON, 0.00105);
   const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 4000);
-  const SUN_DIR = new THREE.Vector3(0.55, 0.72, 0.42).normalize();
+  // mid-morning sun: low enough for long, modelling shadows
+  const SUN_DIR = new THREE.Vector3(0.62, 0.5, 0.48).normalize();
 
-  // Sky: analytic gradient + sun disc & glow, drawn in a shader
+  // Sky: single-scattering style gradient (deep blue zenith, pale hazy horizon, warm forward-scatter halo round the sun)
   const skyMat = new THREE.ShaderMaterial({
-    uniforms: { sunDir: { value: SUN_DIR }, zenith: { value: new THREE.Color(0x2a66c8) }, mid: { value: new THREE.Color(0x7fb2ea) }, horizon: { value: HORIZON }, sunColor: { value: new THREE.Color(0xfff3d0) } },
+    uniforms: { sunDir: { value: SUN_DIR }, zenith: { value: new THREE.Color(0x2f62b4) }, horizon: { value: HORIZON }, ground: { value: new THREE.Color(0x8f9a8c) }, sunColor: { value: new THREE.Color(0xfff0d6) } },
     vertexShader: `varying vec3 vDir; void main(){ vDir = (modelMatrix * vec4(position,1.0)).xyz - cameraPosition; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-    fragmentShader: `uniform vec3 sunDir, zenith, mid, horizon, sunColor; varying vec3 vDir;
-      void main(){ vec3 d = normalize(vDir); float h = d.y;
-        vec3 col = h > 0.0 ? mix(mid, zenith, pow(min(h * 1.6, 1.0), 0.8)) : horizon;
-        col = mix(horizon, col, smoothstep(-0.02, 0.22, h));
-        float s = max(dot(d, sunDir), 0.0);
-        col += sunColor * (pow(s, 2200.0) * 2.2 + pow(s, 90.0) * 0.55 + pow(s, 5.0) * 0.16);
+    fragmentShader: `uniform vec3 sunDir, zenith, horizon, ground, sunColor; varying vec3 vDir;
+      void main(){ vec3 d = normalize(vDir); float h = d.y; float mu = max(dot(d, sunDir), 0.0);
+        float t = pow(1.0 - clamp(h, 0.0, 1.0), 5.0);
+        vec3 col = mix(zenith, horizon, t);
+        col = mix(col, ground, smoothstep(0.0, -0.25, h));
+        col += vec3(1.0, 0.78, 0.52) * pow(mu, 6.0) * 0.35 * t;             // warm haze toward the sun
+        col += sunColor * (pow(mu, 3000.0) * 40.0 + pow(mu, 400.0) * 1.2 + pow(mu, 40.0) * 0.25);
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
     side: THREE.BackSide, depthWrite: false, fog: false,
   });
-  const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 32, 16), skyMat);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(2800, 48, 24), skyMat);
   sky.renderOrder = -10;
   scene.add(sky);
 
+  // Image-based ambient light: prefilter the sky into an environment map so every PBR surface
+  // picks up soft blue skylight from above, ground bounce from below and sky reflections at grazing angles.
+  (function makeEnvironment() {
+    const envScene = new THREE.Scene();
+    envScene.add(new THREE.Mesh(new THREE.SphereGeometry(100, 48, 24), skyMat));
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(envScene, 0.02, 0.1, 400).texture;
+    pmrem.dispose();
+  })();
+
   // Lights
-  const hemi = new THREE.HemisphereLight(0xbcd6ff, 0x5f7040, 1.0);
+  const hemi = new THREE.HemisphereLight(0xa9c6ee, 0x55603c, 0.35);
   scene.add(hemi);
-  const sun = new THREE.DirectionalLight(0xfff1dc, 3.0);
+  const sun = new THREE.DirectionalLight(0xffe7c7, 3.4);
   sun.castShadow = true;
   const SHADOW = LOW ? 1024 : 2048;
   sun.shadow.mapSize.set(SHADOW, SHADOW);
@@ -312,41 +414,80 @@
   // Terrain
   // ---------------------------------------------------------------------------
   (function makeTerrain() {
-    const SEG = LOW ? 180 : 240;
+    const SEG = TERRAIN.SEG;
     const geo = new THREE.PlaneGeometry(HALF * 2, HALF * 2, SEG, SEG);
     geo.rotateX(-Math.PI / 2);
     const pos = geo.attributes.position;
-    const colors = new Float32Array(pos.count * 3);
-    const sand = [0.80, 0.72, 0.52], dirt = [0.50, 0.42, 0.30], rock = [0.50, 0.47, 0.44], snow = [0.96, 0.97, 0.99];
+    const colors = new Float32Array(pos.count * 3), blend = new Float32Array(pos.count * 3);
+    // linear-space albedos, in the range of real ground materials (vegetation ~0.1-0.25, dry sand ~0.4)
+    const lush = [0.075, 0.13, 0.035], meadow = [0.15, 0.2, 0.06], dry = [0.26, 0.24, 0.1], dirt = [0.2, 0.14, 0.08];
+    const sand = [0.46, 0.38, 0.24], wet = [0.2, 0.17, 0.11], bed = [0.12, 0.11, 0.075], rock = [0.25, 0.23, 0.21], snow = [0.82, 0.86, 0.9];
+    const mix3 = (a, b, t) => { a[0] = lerp(a[0], b[0], t); a[1] = lerp(a[1], b[1], t); a[2] = lerp(a[2], b[2], t); };
+    TERRAIN.heights = new Float32Array(pos.count);
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i);
       const h = terrainH(x, z);
-      pos.setY(i, h);
-      const n = fbm(x * 0.05, z * 0.05, 2), n2 = fbm(x * 0.012 + 40, z * 0.012 + 17, 3);
-      let r = 0.36 + 0.14 * n + 0.08 * n2, g = 0.50 + 0.16 * n, b = 0.20 + 0.07 * n;
-      const dirtT = smoothstep(0.58, 0.72, n2) * 0.8;
-      r = lerp(r, dirt[0] + 0.05 * n, dirtT); g = lerp(g, dirt[1] + 0.05 * n, dirtT); b = lerp(b, dirt[2], dirtT);
-      if (h < 3.4) { const t = clamp((h - 1.6) / 1.8, 0, 1); r = lerp(sand[0] + 0.05 * n, r, t); g = lerp(sand[1] + 0.05 * n, g, t); b = lerp(sand[2], b, t); }
+      pos.setY(i, h); TERRAIN.heights[i] = h;
+      const n = fbm(x * 0.05, z * 0.05, 2), n2 = fbm(x * 0.012 + 40, z * 0.012 + 17, 3), n3 = fbm(x * 0.004 + 9, z * 0.004 - 3, 3);
+      const c = meadow.slice();
+      mix3(c, lush, smoothstep(0.45, 0.62, fbm(x * 0.008 + 11, z * 0.008 + 5, 2)) * 0.85);   // darker, wetter ground under the forests
+      mix3(c, dry, smoothstep(0.5, 0.7, n3) * 0.7);
+      mix3(c, dirt, smoothstep(0.6, 0.74, n2) * 0.75);
+      c[0] *= 0.85 + 0.3 * n; c[1] *= 0.85 + 0.3 * n; c[2] *= 0.85 + 0.3 * n;
+      const lakeD = nearestLakeDist(x, z);
+      let sandT = 0;
+      if (h < 3.4) { sandT = 1 - clamp((h - 1.6) / 1.8, 0, 1); mix3(c, sand, sandT); }
+      if (h < 1.7) mix3(c, wet, smoothstep(1.7, 0.6, h) * (lakeD < 6 ? 1 : 0));            // dark wet margin at the waterline
+      if (h < 0.4) mix3(c, bed, smoothstep(0.4, -2.5, h));
       const sx = terrainH(x + 3, z) - terrainH(x - 3, z), sz = terrainH(x, z + 3) - terrainH(x, z - 3);
       const slope = Math.hypot(sx, sz) / 6;
-      const rockT = Math.max(clamp((h - 38) / 22, 0, 1), clamp((slope - 0.7) / 0.5, 0, 1));
-      r = lerp(r, rock[0] + 0.1 * n, rockT); g = lerp(g, rock[1] + 0.1 * n, rockT); b = lerp(b, rock[2] + 0.08 * n, rockT);
+      const rockT = Math.max(clamp((h - 38) / 22, 0, 1), clamp((slope - 0.6) / 0.45, 0, 1));
+      mix3(c, [rock[0] * (0.8 + 0.4 * n), rock[1] * (0.8 + 0.4 * n), rock[2] * (0.8 + 0.35 * n)], rockT);
       const snowT = clamp((h - 95) / 30, 0, 1) * (1 - clamp((slope - 1.6) / 0.8, 0, 1));
-      r = lerp(r, snow[0], snowT); g = lerp(g, snow[1], snowT); b = lerp(b, snow[2], snowT);
-      colors[i * 3] = r; colors[i * 3 + 1] = g; colors[i * 3 + 2] = b;
+      mix3(c, snow, snowT);
+      colors[i * 3] = c[0]; colors[i * 3 + 1] = c[1]; colors[i * 3 + 2] = c[2];
+      blend[i * 3] = rockT; blend[i * 3 + 1] = snowT; blend[i * 3 + 2] = Math.max(sandT, h < 0.4 ? 1 : 0);
     }
     geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geo.setAttribute('aBlend', new THREE.BufferAttribute(blend, 3));
     geo.computeVertexNormals();
-    grassTex.repeat.set(110, 110);
-    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: grassTex, roughness: 1.0, metalness: 0.0 });
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, map: grassTex, roughness: 0.97, metalness: 0.0 });
+    // World-space texturing: two scales of the ground texture blended together (kills visible tiling), triplanar
+    // rock on cliffs and peaks, fine grain for sand and snow, and a broad noise layer for large-scale variation.
+    const grassMean = texMean(grassTex), rockMean = texMean(rockTex);
+    mat.onBeforeCompile = sh => {
+      Object.assign(sh.uniforms, { rockMap: { value: rockTex }, noiseMap: { value: noiseTex }, grassMean: { value: grassMean }, rockMean: { value: rockMean } });
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute vec3 aBlend; varying vec3 vBlend; varying vec3 vWPos; varying vec3 vWNrm;')
+        .replace('#include <project_vertex>', '#include <project_vertex>\nvBlend = aBlend; vWPos = (modelMatrix * vec4(transformed, 1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * objectNormal);');
+      sh.fragmentShader = sh.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform sampler2D rockMap, noiseMap; uniform vec3 grassMean, rockMean; varying vec3 vBlend; varying vec3 vWPos; varying vec3 vWNrm;')
+        .replace('#include <map_fragment>', `
+          vec2 wxz = vWPos.xz;
+          vec3 gA = texture2D(map, wxz * 0.11).rgb, gB = texture2D(map, wxz * 0.027 + vec2(0.31, 0.17)).rgb;
+          vec3 grassD = (gA * 0.55 + gB * 0.45) / grassMean;
+          vec3 bw = pow(abs(normalize(vWNrm)), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
+          vec3 rk = texture2D(rockMap, vWPos.zy * 0.045).rgb * bw.x + texture2D(rockMap, wxz * 0.045).rgb * bw.y + texture2D(rockMap, vWPos.xy * 0.045).rgb * bw.z;
+          rk = mix(rk, texture2D(rockMap, wxz * 0.011 + 0.5).rgb, 0.35) / rockMean;
+          float grain = texture2D(noiseMap, wxz * 0.35).r;
+          vec3 detail = mix(grassD, vec3(0.8 + 0.4 * grain), vBlend.z);
+          detail = mix(detail, rk, vBlend.x);
+          detail = mix(detail, vec3(0.94 + 0.12 * grain), vBlend.y);
+          float macro = texture2D(noiseMap, wxz * 0.0021).r, meso = texture2D(noiseMap, wxz * 0.017 + 0.3).r;
+          diffuseColor.rgb *= detail * (0.72 + 0.56 * macro) * (0.86 + 0.28 * meso);
+        `);
+    };
     const terrain = new THREE.Mesh(geo, mat);
     terrain.receiveShadow = true;
     scene.add(terrain);
   })();
 
   // Lakes: rippling normal-mapped water
-  waterNormal.repeat.set(7, 7);
-  const waterMat = new THREE.MeshPhongMaterial({ color: 0x1f6592, specular: 0xffffff, shininess: 180, transparent: true, opacity: 0.86, normalMap: waterNormal, normalScale: new THREE.Vector2(0.35, 0.35), reflectivity: 0.6 });
+  // PBR water: dark, almost mirror-smooth, so the sky environment reflects with real Fresnel (clear from above,
+  // silvery at grazing angles) and the sun leaves a glitter path across the ripples.
+  waterNormal.repeat.set(26, 26);
+  const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x0a3140, roughness: 0.1, metalness: 0.0, ior: 1.33, transparent: true, opacity: 0.88,
+    normalMap: waterNormal, normalScale: new THREE.Vector2(0.1, 0.1), envMapIntensity: 0.9 });
   for (const L of LAKES) {
     const geo = new THREE.CircleGeometry(L.r, 72);
     geo.rotateX(-Math.PI / 2);
@@ -361,7 +502,7 @@
   // ---------------------------------------------------------------------------
   function merge(geos) {
     geos = geos.map(g => g.index ? g.toNonIndexed() : g);
-    const names = ['position', 'normal', 'uv', 'color'].filter(nm => geos.every(g => g.attributes[nm]));
+    const names = ['position', 'normal', 'uv', 'color', 'aSkin'].filter(nm => geos.every(g => g.attributes[nm]));
     const out = new THREE.BufferGeometry();
     for (const nm of names) {
       const item = geos[0].attributes[nm].itemSize;
@@ -388,19 +529,45 @@
   (function makeForests() {
     const K = LOW ? 0.6 : 1;
     const N_CONE = Math.round(900 * K), N_ROUND = Math.round(420 * K), N_BUSH = Math.round(520 * K), N_ROCK = 150;
-    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.45, 1, 7); trunkGeo.translate(0, 0.5, 0);
-    // conifer: three stacked tiers
-    const tier = (r, h, y) => { const g = new THREE.ConeGeometry(r, h, 9); g.translate(0, y + h / 2, 0); return g; };
-    const coneGeo = merge([tier(1.0, 0.5, 0), tier(0.8, 0.45, 0.3), tier(0.55, 0.4, 0.6)]);
-    // broadleaf: lumpy cluster of spheres
-    const lump = (r, x, y, z) => { const g = new THREE.SphereGeometry(r, 10, 8); g.translate(x, y, z); return g; };
-    const roundGeo = merge([lump(1, 0, 0, 0), lump(0.7, 0.6, 0.35, 0.2), lump(0.65, -0.55, 0.3, -0.3), lump(0.6, 0.1, 0.55, -0.5), lump(0.55, -0.2, -0.3, 0.6)]);
-    const bushGeo = merge([lump(1, 0, 0, 0), lump(0.7, 0.7, -0.1, 0.3), lump(0.6, -0.6, -0.1, -0.4)]);
-    const rockGeo = new THREE.DodecahedronGeometry(1, 1);
+    const trunkGeo = new THREE.CylinderGeometry(0.22, 0.45, 1, 9, 4);
+    trunkGeo.translate(0, 0.5, 0);
+    displace(trunkGeo, 0.06, 2.5);
+    // Organic shapes: push each vertex in or out along its normal with smooth 3D noise, then re-light it.
+    // (Displacement depends only on position, so coincident vertices along seams move together.)
+    function displace(g, amt, freq, seed) {
+      const p = g.attributes.position, nrm = g.attributes.normal, o = seed || 0;
+      for (let i = 0; i < p.count; i++) {
+        const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+        const k = (fbm(x * freq + o + y * 0.7 * freq, z * freq - y * 1.3 * freq + o * 0.5, 3) - 0.5) * 2 * amt;
+        p.setXYZ(i, x + nrm.getX(i) * k, y + nrm.getY(i) * k, z + nrm.getZ(i) * k);
+      }
+      g.computeVertexNormals();
+      return g;
+    }
+    // Baked ambient occlusion: canopy interiors and undersides darker, sunlit outer tips brighter.
+    function bakeAO(g, minY, maxY, rMax, floor) {
+      const p = g.attributes.position, col = new Float32Array(p.count * 3);
+      for (let i = 0; i < p.count; i++) {
+        const y = p.getY(i), r = Math.hypot(p.getX(i), p.getZ(i));
+        const v = lerp(floor, 1.0, smoothstep(minY, maxY, y) * 0.65 + smoothstep(rMax * 0.3, rMax, r) * 0.35);
+        col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = v;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return g;
+    }
+    // conifer (podocarp / araucarian outline): five shaggy tiers with drooping skirts
+    const tier = (r, h, y, s) => { const g = new THREE.ConeGeometry(r, h, 16, 3); g.translate(0, y + h / 2, 0); return displace(g, r * 0.16, 4.5, s); };
+    const coneGeo = bakeAO(merge([tier(1.0, 0.36, 0, 1), tier(0.86, 0.34, 0.18, 2), tier(0.72, 0.32, 0.36, 3), tier(0.56, 0.3, 0.54, 4), tier(0.36, 0.3, 0.72, 5)]), 0, 1, 1, 0.42);
+    // broadleaf: a cluster of irregular lobes rather than smooth balls
+    const lump = (r, x, y, z, s) => { const g = new THREE.SphereGeometry(r, 18, 14); displace(g, r * 0.22, 2.6 / r, s); g.translate(x, y, z); return g; };
+    const roundGeo = bakeAO(merge([lump(1, 0, 0, 0, 1), lump(0.7, 0.6, 0.35, 0.2, 2), lump(0.65, -0.55, 0.3, -0.3, 3), lump(0.6, 0.1, 0.55, -0.5, 4), lump(0.55, -0.2, -0.3, 0.6, 5), lump(0.5, 0.55, -0.15, -0.45, 6)]), -0.9, 1.0, 1.3, 0.38);
+    const bushGeo = bakeAO(merge([lump(1, 0, 0, 0, 7), lump(0.7, 0.7, -0.1, 0.3, 8), lump(0.6, -0.6, -0.1, -0.4, 9)]), -0.8, 0.8, 1.4, 0.45);
+    const rockGeo = displace(new THREE.IcosahedronGeometry(1, 3), 0.28, 1.6, 3);
 
     const trunkMat = new THREE.MeshStandardMaterial({ map: barkTex, roughness: 0.95 });
-    const leafMat = new THREE.MeshStandardMaterial({ map: leafTex, roughness: 0.9 });
-    const rockMat = new THREE.MeshStandardMaterial({ map: rockTex, roughness: 0.95 });
+    leafTex.repeat.set(5, 4);
+    const leafMat = new THREE.MeshStandardMaterial({ map: leafTex, vertexColors: true, roughness: 0.82 });
+    const rockMat = new THREE.MeshStandardMaterial({ map: rockTex, roughness: 0.9 });
     const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, N_CONE + N_ROUND);
     const cones = new THREE.InstancedMesh(coneGeo, leafMat, N_CONE);
     const rounds = new THREE.InstancedMesh(roundGeo, leafMat, N_ROUND);
@@ -443,6 +610,91 @@
     for (const im of [trunks, cones, rounds, bushes, rocks]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; scene.add(im); }
   })();
 
+  // ---------------------------------------------------------------------------
+  // Ground cover: ferns and horsetails (the Cretaceous understorey; grasses were still rare).
+  // Too many to place across the whole island, so they live in a window of cells around the player.
+  // Each cell's plants are generated from a seed for that cell, so a cell always looks the same when you return,
+  // and when the window slides only the newly uncovered row or column of cells is rebuilt.
+  // ---------------------------------------------------------------------------
+  const groundCover = (function makeGroundCover() {
+    const CELL = 14, H = LOW ? 4 : 7, N = H * 2 + 1, R = H * CELL;
+    const kinds = [
+      { tex: fernTex, per: LOW ? 34 : 55, planes: 3, w: 1.0, h: 0.8, size: [0.7, 1.9], hue: [0.22, 0.3] },
+      { tex: horsetailTex, per: LOW ? 8 : 14, planes: 2, w: 0.7, h: 1.2, size: [0.5, 1.1], hue: [0.2, 0.26] },
+    ];
+    const time = { value: 0 }, fadeR = { value: R * 0.92 };
+    function plantGeo(planes, w, h) {
+      const geos = [];
+      for (let i = 0; i < planes; i++) {
+        const g = new THREE.PlaneGeometry(w, h); g.translate(0, h / 2, 0); g.rotateY(i * Math.PI / planes);
+        const nrm = g.attributes.normal; for (let j = 0; j < nrm.count; j++) nrm.setXYZ(j, 0, 1, 0);   // lit like the ground they grow from
+        geos.push(g);
+      }
+      return merge(geos);
+    }
+    function rng(seed) { return () => { seed = (seed + 0x6D2B79F5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    for (const k of kinds) {
+      const mat = new THREE.MeshStandardMaterial({ map: k.tex, alphaTest: 0.42, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.85 });
+      mat.onBeforeCompile = sh => {
+        sh.uniforms.uTime = time; sh.uniforms.uFadeR = fadeR;
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nuniform float uTime, uFadeR;')
+          .replace('#include <begin_vertex>', `#include <begin_vertex>
+            vec3 io = (modelMatrix * instanceMatrix[3]).xyz;
+            float fade = smoothstep(uFadeR, uFadeR * 0.72, distance(io.xz, cameraPosition.xz));
+            float sway = sin(uTime * 1.6 + io.x * 0.21 + io.z * 0.17) + 0.5 * sin(uTime * 2.9 + io.z * 0.4);
+            transformed.xz += vec2(0.06, 0.035) * sway * position.y * position.y;
+            transformed *= fade;`);
+      };
+      k.mesh = new THREE.InstancedMesh(plantGeo(k.planes, k.w, k.h), mat, N * N * k.per);
+      k.mesh.receiveShadow = true;
+      k.mesh.frustumCulled = false;   // instances move around; the window is always around the camera anyway
+      k.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      k.mesh.setColorAt(0, _c.set(0xffffff));
+      scene.add(k.mesh);
+    }
+    const slotCell = new Array(N * N).fill(null);
+    const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+    function fillCell(slot, cx, cz) {
+      const forestN = fbm((cx + 0.5) * CELL * 0.008 + 11, (cz + 0.5) * CELL * 0.008 + 5, 2);
+      for (let ki = 0; ki < kinds.length; ki++) {
+        const k = kinds[ki], r = rng((Math.imul(cx, 73856093) ^ Math.imul(cz, 19349663) ^ (ki * 83492791)) | 0);
+        for (let j = 0; j < k.per; j++) {
+          const idx = slot * k.per + j;
+          const x = (cx + r()) * CELL, z = (cz + r()) * CELL, keep = r(), sz = lerp(k.size[0], k.size[1], r()), yaw = r() * TAU, hue = lerp(k.hue[0], k.hue[1], r()), lit = r();
+          if (Math.abs(x) > HALF - 10 || Math.abs(z) > HALF - 10) { k.mesh.setMatrixAt(idx, ZERO); continue; }
+          const h = meshH(x, z);
+          const slope = Math.abs(meshH(x + 1.5, z) - meshH(x - 1.5, z)) + Math.abs(meshH(x, z + 1.5) - meshH(x, z - 1.5));
+          const patch = fbm(x * 0.045 + ki * 7, z * 0.045 - ki * 3, 2);
+          const want = clamp(0.15 + (forestN - 0.42) * 2.2 + (patch - 0.5) * 1.6, 0.04, 1) * (ki === 1 ? 1 + smoothstep(12, 3, nearestLakeDist(x, z)) * 2 : 1);
+          if (h < 1.9 || h > 48 || slope > 2.2 || keep > want) { k.mesh.setMatrixAt(idx, ZERO); continue; }
+          _q.setFromAxisAngle(_p.set(0, 1, 0), yaw);
+          _m.compose(_p.set(x, h - 0.05, z), _q, _s.set(sz, sz * lerp(0.8, 1.2, lit), sz));
+          k.mesh.setMatrixAt(idx, _m);
+          k.mesh.setColorAt(idx, _c.setHSL(hue, 0.42, lerp(0.3, 0.46, lit)));
+        }
+      }
+    }
+    let lastX = null, lastZ = null;
+    function update(px, pz, t, camH) {
+      time.value = t;
+      const show = camH < 110;
+      for (const k of kinds) k.mesh.visible = show;
+      const cx = Math.floor(px / CELL), cz = Math.floor(pz / CELL);
+      if (cx === lastX && cz === lastZ) return;
+      lastX = cx; lastZ = cz;
+      let changed = false;
+      for (let ix = cx - H; ix <= cx + H; ix++) for (let iz = cz - H; iz <= cz + H; iz++) {
+        const slot = (((ix % N) + N) % N) * N + (((iz % N) + N) % N);
+        const key = ix * 100003 + iz;
+        if (slotCell[slot] === key) continue;
+        slotCell[slot] = key; fillCell(slot, ix, iz); changed = true;
+      }
+      if (changed) for (const k of kinds) { k.mesh.instanceMatrix.needsUpdate = true; k.mesh.instanceColor.needsUpdate = true; }
+    }
+    return { update };
+  })();
+
   // Clouds: soft sprite clusters
   const clouds = [];
   (function makeClouds() {
@@ -467,12 +719,73 @@
   // ---------------------------------------------------------------------------
   // Creature construction
   // ---------------------------------------------------------------------------
-  skinBump.repeat.set(3, 3);
-  const skinMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, metalness: 0.0, bumpMap: skinBump, bumpScale: 0.035 });
-  const skinMat2 = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.75, metalness: 0.0, side: THREE.DoubleSide, bumpMap: skinBump, bumpScale: 0.02 });
+  // Procedural reptile skin, evaluated per pixel in the model's own space (metres), so scales are the same size
+  // everywhere regardless of how a primitive's UVs stretch: a Voronoi pattern of small domed scales with grooves
+  // between them, a sparser layer of larger tubercles, and soft folds. It drives the albedo (darker grooves),
+  // the roughness (scale tops slightly glossier) and the surface normal. Flat-painted parts (eyes, teeth, claws)
+  // skip it and are glossy instead. Detail fades out with distance and pixel size, so it never shimmers.
+  const SKIN_GLSL = `
+    varying vec3 vSkinPos; varying float vSkin;
+    uniform float uScaleDen, uBumpAmt, uFolds;
+    vec3 skHash(vec3 p) { p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6))); return fract(sin(p) * 43758.5453); }
+    vec2 skCell(vec3 p) {
+      vec3 i = floor(p), f = fract(p); float d1 = 8.0, d2 = 8.0;
+      for (int z = -1; z <= 1; z++) for (int y = -1; y <= 1; y++) for (int x = -1; x <= 1; x++) {
+        vec3 g = vec3(float(x), float(y), float(z)); vec3 r = g + skHash(i + g) * 0.85 - f; float d = dot(r, r);
+        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+      }
+      return sqrt(vec2(d1, d2));
+    }
+    float skNoise(vec3 p) {
+      vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(mix(skHash(i).x, skHash(i + vec3(1, 0, 0)).x, f.x), mix(skHash(i + vec3(0, 1, 0)).x, skHash(i + vec3(1, 1, 0)).x, f.x), f.y),
+                 mix(mix(skHash(i + vec3(0, 0, 1)).x, skHash(i + vec3(1, 0, 1)).x, f.x), mix(skHash(i + vec3(0, 1, 1)).x, skHash(i + vec3(1, 1, 1)).x, f.x), f.y), f.z);
+    }
+  `;
+  const SKIN_LOW = LOW ? '#define SKIN_LOW\n' : '';
+  const skinMats = {};
+  function skinMaterial(den, doubleSide) {
+    const key = den + (doubleSide ? 'd' : 's');
+    if (skinMats[key]) return skinMats[key];
+    const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: doubleSide ? 0.72 : 0.68, metalness: 0.0, side: doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+      bumpMap: skinBump, bumpScale: 0 });   // the bump map only switches on three.js's bump-mapping code; the height comes from the shader below
+    m.onBeforeCompile = sh => {
+      Object.assign(sh.uniforms, { uScaleDen: { value: den }, uBumpAmt: { value: doubleSide ? 0.5 : 1.0 }, uFolds: { value: doubleSide ? 0.3 : 1.0 } });
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float aSkin; varying vec3 vSkinPos; varying float vSkin;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvSkinPos = position; vSkin = aSkin;');
+      sh.fragmentShader = SKIN_LOW + sh.fragmentShader
+        .replace('#include <common>', '#include <common>\n' + SKIN_GLSL)
+        .replace('#include <color_fragment>', `#include <color_fragment>
+          vec3 sp = vSkinPos * uScaleDen;
+          float skPix = length(fwidth(sp));
+          float skFade = vSkin * smoothstep(0.9, 0.2, skPix);            // fade once a scale shrinks to about a pixel
+          vec2 c1 = skCell(sp);
+          float scaleTop = smoothstep(0.0, 0.1, c1.y - c1.x);              // 0 in the grooves, 1 across each scale
+          float skH = scaleTop * (1.0 - 0.6 * c1.x);
+          #ifndef SKIN_LOW
+            vec2 c2 = skCell(vSkinPos * uScaleDen * 0.3 + 17.0);
+            skH += smoothstep(0.5, 0.1, c2.x) * 0.9;                        // scattered larger tubercles
+          #endif
+          float fold = skNoise(vSkinPos * vec3(2.0, 7.0, 2.0)) * uFolds;
+          skH += fold * 0.6;
+          float skFar = vSkin * smoothstep(0.9, 0.2, length(fwidth(vSkinPos * 2.0)));
+          diffuseColor.rgb *= mix(1.0, mix(0.72, 1.05, scaleTop), skFade) * mix(1.0, 0.86 + 0.28 * fold, skFar);`)
+        .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
+          roughnessFactor = mix(0.3, roughnessFactor + 0.12 - 0.22 * scaleTop * skFade, vSkin);`)
+        .replace('#include <normal_fragment_maps>', `
+          vec2 skD = vec2(dFdx(skH), dFdy(skH)) * uBumpAmt * 0.02 * (skFade + 0.5 * skFar);
+          normal = perturbNormalArb(-vViewPosition, normal, skD, faceDirection);`);
+    };
+    return (skinMats[key] = m);
+  }
+  const skinMat = skinMaterial(10, false), skinMat2 = skinMaterial(10, true);
+  // Player-sized models are built with more polygons (smoother silhouettes up close); the herds keep the lighter meshes.
+  let HQ = false;
+  const seg = n => HQ ? Math.round(n * 1.7) : n;
 
-  function ell(rx, ry, rz, seg) { const s = seg || 12; const g = new THREE.SphereGeometry(1, s, Math.max(6, Math.round(s * 0.75))); g.scale(rx, ry, rz); return g; }
-  function frustum(rF, rB, len, radial) { const g = new THREE.CylinderGeometry(rF, rB, len, radial || 10); g.rotateX(Math.PI / 2); return g; }
+  function ell(rx, ry, rz, sg) { const s = seg(sg || 12); const g = new THREE.SphereGeometry(1, s, Math.max(6, Math.round(s * 0.75))); g.scale(rx, ry, rz); return g; }
+  function frustum(rF, rB, len, radial) { const g = new THREE.CylinderGeometry(rF, rB, len, seg(radial || 10), HQ ? 3 : 1); g.rotateX(Math.PI / 2); return g; }
   function tbox(wF, hF, wB, hB, len) {
     const g = new THREE.BoxGeometry(1, 1, len);
     const p = g.attributes.position;
@@ -507,11 +820,13 @@
       col[i * 3] = _col.r; col[i * 3 + 1] = _col.g; col[i * 3 + 2] = _col.b;
     }
     g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    g.setAttribute('aSkin', new THREE.BufferAttribute(new Float32Array(n).fill(flat != null ? 0 : 1), 1));
     return g;
   }
+  // pal.scale: scales per metre (big theropods ~7, a raptor ~16); membranes and crests use the double-sided variant
   function skinMesh(parts, pal, material) {
     const geos = parts.map(p => Array.isArray(p) ? paint(p[0], pal, p[1]) : paint(p, pal));
-    const m = new THREE.Mesh(merge(geos), material || skinMat);
+    const m = new THREE.Mesh(merge(geos), skinMaterial(pal.scale || 10, material === skinMat2));
     m.castShadow = true;
     return m;
   }
@@ -523,17 +838,30 @@
     }
     return out;
   }
-  function chain(parent, x, y, z, segs, pal, backward) {
+  // opts.ridge: a row of small osteoderm bumps along the top; opts.fin: a tall fin of skin over neural spines (height
+  // as a multiple of the segment radius), drawn with opts.finPal
+  function chain(parent, x, y, z, segs, pal, backward, opts) {
+    opts = opts || {};
     const pivots = [];
     let cur = new THREE.Group(); cur.position.set(x, y, z); parent.add(cur);
     const dir = backward ? -1 : 1;
     for (const s of segs) {
       cur.rotation.x = s.bend || 0; cur.userData.rest = s.bend || 0;
-      const g = backward ? frustum(s.r0, s.r1, s.len, 10) : frustum(s.r1, s.r0, s.len, 10);
+      const g = backward ? frustum(s.r0, s.r1, s.len, 12) : frustum(s.r1, s.r0, s.len, 12);
       if (s.sx || s.sy) g.scale(s.sx || 1, s.sy || 1, 1);
       g.translate(0, 0, dir * s.len / 2);
-      const joint = ell(s.r0 * 1.03 * (s.sx || 1), s.r0 * 1.03 * (s.sy || 1), s.r0 * 1.03, 10);
-      cur.add(skinMesh([g, joint], withOff(pal, y)));
+      const joint = ell(s.r0 * (s.sx || 1), s.r0 * (s.sy || 1), s.r0, 12);   // exactly the segment's radius, so joints don't bulge into rings
+      const parts = [g, joint];
+      if (opts.ridge) for (let k = 0; k < 3; k++) {
+        const t = (k + 0.5) / 3, rr = lerp(s.r0, s.r1, t);
+        parts.push(place(ell(rr * 0.16, rr * 0.13, rr * 0.28, 7), 0, rr * (s.sy || 1) * 0.96, dir * s.len * t));
+      }
+      cur.add(skinMesh(parts, withOff(pal, y)));
+      if (opts.fin) {
+        const y0 = s.r0 * (s.sy || 1) * 0.7, y1 = s.r1 * (s.sy || 1) * 0.7, h0 = s.r0 * opts.fin, h1 = s.r1 * opts.fin;
+        const sh = new THREE.Shape(); sh.moveTo(0, y0); sh.lineTo(dir * s.len * 1.02, y1); sh.lineTo(dir * s.len * 1.02, y1 + h1); sh.lineTo(0, y0 + h0); sh.closePath();
+        cur.add(skinMesh([place(new THREE.ShapeGeometry(sh, 1), 0, 0, 0, 0, -Math.PI / 2, 0)], withOff(opts.finPal || pal, y), skinMat2));
+      }
       pivots.push(cur);
       const next = new THREE.Group(); next.position.set(0, 0, dir * s.len); cur.add(next); cur = next;
     }
@@ -545,16 +873,39 @@
     const footH = r * 0.75;
     const hipY = thigh + shin * Math.cos(kneeRest) + footH;
     const hip = new THREE.Group(); hip.position.set(x, hipY, z + shin * Math.sin(kneeRest) * 0.5); parent.add(hip);
-    hip.add(skinMesh([place(new THREE.CylinderGeometry(r * 0.72, r, thigh, 10), 0, -thigh / 2, 0), ell(r * 1.2, r * 1.15, r * 1.35, 10)], withOff(pal, hipY)));
+    // legs keep the back colour on the thigh and darken to scaly brown at the feet, instead of taking the pale belly colour
+    const legPal = Object.assign({}, pal, { belly: new THREE.Color(pal.top).multiplyScalar(0.7), yBelly: 0, yTop: hipY * 0.95 });
+    const CYL = (a, b, h) => new THREE.CylinderGeometry(a, b, h, seg(12), HQ ? 3 : 1);
+    if (opts.claws) {
+      // theropod leg: heavy drumstick thigh, slim shin with a calf, and a three-toed foot with claws
+      hip.add(skinMesh([place(ell(r * 1.3, thigh * 0.56, r * 1.55, 14), 0, -thigh * 0.36, -r * 0.12), place(CYL(r * 0.62, r * 0.95, thigh), 0, -thigh / 2, 0), ell(r * 1.2, r * 1.15, r * 1.35, 12)], withOff(legPal, hipY)));
+    } else {
+      hip.add(skinMesh([place(CYL(r * 0.72, r, thigh), 0, -thigh / 2, 0), ell(r * 1.2, r * 1.15, r * 1.35, 12)], withOff(legPal, hipY)));
+    }
     const knee = new THREE.Group(); knee.position.set(0, -thigh, 0); hip.add(knee);
     knee.rotation.x = kneeRest;
-    knee.add(skinMesh([place(new THREE.CylinderGeometry(r * 0.72, r * 0.5, shin, 10), 0, -shin / 2, 0), ell(r * 0.78, r * 0.78, r * 0.85, 10)], withOff(pal, hipY - thigh)));
+    const shinParts = [place(CYL(r * 0.68, r * 0.45, shin), 0, -shin / 2, 0), ell(r * 0.78, r * 0.78, r * 0.85, 10)];
+    if (opts.claws) shinParts.push(place(ell(r * 0.62, shin * 0.3, r * 0.72, 10), 0, -shin * 0.27, -r * 0.2));
+    knee.add(skinMesh(shinParts, withOff(legPal, hipY - thigh)));
     const ankle = new THREE.Group(); ankle.position.set(0, -shin, 0); knee.add(ankle);
     ankle.rotation.x = -kneeRest;
-    const foot = [place(tbox(r * 1.7, footH * 0.7, r * 1.15, footH, footLen), 0, -footH / 2, footLen * 0.32), place(ell(r * 0.6, r * 0.55, r * 0.6, 8), 0, -footH * 0.4, 0)];
-    if (opts.claws) for (const dx of [-0.55, 0, 0.55]) foot.push([place(coneZ(r * 0.2, r * 0.85, 6), dx * r * 1.25, -footH * 0.7, footLen * 0.8), 0x2a2420]);
-    if (opts.hooves) for (const dx of [-0.5, 0.5]) foot.push([place(tbox(r * 0.55, footH * 0.5, r * 0.6, footH * 0.6, r * 0.5), dx * r * 0.9, -footH * 0.72, footLen * 0.8), 0x3a322a]);
-    ankle.add(skinMesh(foot, withOff(pal, 0)));
+    let foot;
+    if (opts.claws) {
+      foot = [place(ell(r * 0.55, r * 0.5, r * 0.55, 10), 0, -footH * 0.3, 0), place(ell(r * 0.85, footH * 0.42, footLen * 0.26, 10), 0, -footH * 0.6, footLen * 0.12)];
+      for (const dx of [-1, 0, 1]) {
+        const ry = dx * 0.3, len = footLen * (dx === 0 ? 0.72 : 0.6), cx = dx * r * 0.62, cz = footLen * 0.2;
+        const tipX = cx + Math.sin(ry) * len, tipZ = cz + Math.cos(ry) * len;
+        foot.push(place(frustum(r * 0.17, r * 0.3, len, 8), (cx + tipX) / 2, -footH * 0.72, (cz + tipZ) / 2, 0, ry, 0));
+        foot.push(place(ell(r * 0.22, r * 0.2, r * 0.24, 6), tipX - Math.sin(ry) * r * 0.15, -footH * 0.72, tipZ - Math.cos(ry) * r * 0.15));
+        foot.push([place(coneZ(r * 0.15, r * 0.6, 6), tipX - Math.sin(ry) * r * 0.1, -footH * 0.72, tipZ - Math.cos(ry) * r * 0.1, 0.45, ry, 0), 0x241e19]);
+      }
+      // dromaeosaur killing claw, held clear of the ground on the second toe
+      if (opts.sickle) foot.push([place(coneZ(r * 0.28, r * 1.6, 7), -r * 0.35, -footH * 0.25, footLen * 0.3, -0.75, 0, 0), 0x1d1814]);
+    } else {
+      foot = [place(tbox(r * 1.7, footH * 0.7, r * 1.15, footH, footLen), 0, -footH / 2, footLen * 0.32), place(ell(r * 0.6, r * 0.55, r * 0.6, 8), 0, -footH * 0.4, 0)];
+      if (opts.hooves) for (const dx of [-0.5, 0.5]) foot.push([place(tbox(r * 0.55, footH * 0.5, r * 0.6, footH * 0.6, r * 0.5), dx * r * 0.9, -footH * 0.72, footLen * 0.8), 0x3a322a]);
+    }
+    ankle.add(skinMesh(foot, withOff(legPal, 0)));
     return { hip, knee, ankle, kneeRest };
   }
   function makeArm(parent, x, y, z, upper, lower, r, pal, claws) {
@@ -562,7 +913,7 @@
     const parts = [place(new THREE.CylinderGeometry(r * 0.8, r, upper, 8), 0, -upper / 2, 0), ell(r * 1.1, r * 1.1, r * 1.1, 8)];
     parts.push(place(new THREE.CylinderGeometry(r * 0.7, r * 0.6, lower, 8), 0, -upper - lower * 0.45, lower * 0.35, -0.7));
     if (claws) for (const dx of [-0.5, 0.5]) parts.push([place(coneZ(r * 0.35, r * 1.6, 5), dx * r, -upper - lower * 0.85, lower * 0.65), 0x2a2420]);
-    a.add(skinMesh(parts, withOff(pal, y)));
+    a.add(skinMesh(parts, withOff(Object.assign({}, pal, { belly: new THREE.Color(pal.top).multiplyScalar(0.6), yBelly: y - upper - lower, yTop: y }), y)));
     return a;
   }
   function teethRow(count, dx, y, z0, dz, len, down) {
@@ -577,10 +928,13 @@
 
   // ------------------------------- Dinosaurs ---------------------------------
   function buildTRex() {
-    const pal = { top: 0x6e5a3a, belly: 0xcdb78c, accent: 0x33291a, yBelly: 3.9, yTop: 6.6, f: 0.55, spots: 0.5 };
+    const pal = { top: 0x5a4630, belly: 0xb09a72, accent: 0x2a2015, yBelly: 3.9, yTop: 6.6, f: 0.55, spots: 0.7, scale: 12 };
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
     body.add(skinMesh([place(ell(1.4, 1.6, 2.7, 14), 0, 5.45, 0.5), place(ell(1.3, 1.4, 1.8, 12), 0, 5.35, -1.5), place(ell(1.1, 1.0, 1.4, 10), 0, 6.2, 2.3)], pal));
-    const neck = chain(body, 0, 6.15, 2.7, [{ len: 1.25, r0: 0.9, r1: 0.74, bend: -0.8 }, { len: 1.25, r0: 0.74, r1: 0.62, bend: 0.62 }], pal, false);
+    const backBumps = [];
+    for (let z = -2.6; z <= 2.4; z += 0.42) { const top = Math.max(ellTop(5.45, 0.5, 1.6, 2.7, z), ellTop(5.35, -1.5, 1.4, 1.8, z), ellTop(6.2, 2.3, 1.0, 1.4, z)); if (top > 0) backBumps.push(place(ell(0.14, 0.11, 0.24, 7), 0, top - 0.04, z)); }
+    body.add(skinMesh(backBumps, pal));
+    const neck = chain(body, 0, 6.15, 2.7, [{ len: 1.25, r0: 0.9, r1: 0.74, bend: -0.8 }, { len: 1.25, r0: 0.74, r1: 0.62, bend: 0.62 }], pal, false, { ridge: true });
     const head = neck.end; head.rotation.x = 0.2; head.userData.rest = 0.2;
     const hp = withOff(pal, 6.4);
     head.add(skinMesh([
@@ -595,7 +949,7 @@
     jaw.add(skinMesh([(() => { const s = frustum(0.42, 0.7, 2.6, 8); s.scale(1.3, 0.7, 1); return place(s, 0, -0.25, 1.45); })(), ...teethRow(4, 0.4, 0.02, 0.9, 0.5, 0.34, false)], hp));
     const tail = chain(body, 0, 5.3, -3.1, [
       { len: 1.9, r0: 1.2, r1: 0.95, bend: -0.05 }, { len: 1.9, r0: 0.95, r1: 0.7, bend: -0.04 }, { len: 1.9, r0: 0.7, r1: 0.5, bend: -0.03 },
-      { len: 2.0, r0: 0.5, r1: 0.3, bend: -0.02 }, { len: 2.2, r0: 0.3, r1: 0.1, bend: 0 }], pal, true);
+      { len: 2.0, r0: 0.5, r1: 0.3, bend: -0.02 }, { len: 2.2, r0: 0.3, r1: 0.1, bend: 0 }], pal, true, { ridge: true });
     const legs = [makeLeg(body, 1.2, -1.0, 2.4, 2.2, 0.66, 1.9, pal, { claws: true }), makeLeg(body, -1.2, -1.0, 2.4, 2.2, 0.66, 1.9, pal, { claws: true })];
     makeArm(body, 1.25, 4.9, 2.2, 0.8, 0.7, 0.2, pal, true); makeArm(body, -1.25, 4.9, 2.2, 0.8, 0.7, 0.2, pal, true);
     return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.5, stride: 0.75, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 0.95, headComp: 0.35, name: 'Tyrannosaurus rex',
@@ -603,8 +957,8 @@
   }
 
   function buildSpino() {
-    const pal = { top: 0x5c7170, belly: 0xc6c0a4, accent: 0x2c3a3b, yBelly: 3.0, yTop: 5.4, f: 0.5, spots: 0.35, stripes: 1.1 };
-    const sailPal = { top: 0xc4562b, belly: 0x8e3a1c, accent: 0x5a2312, yBelly: 5.4, yTop: 8.6, f: 0.7, spots: 0.6 };
+    const pal = { top: 0x485245, belly: 0xa39a7e, accent: 0x222a22, yBelly: 3.0, yTop: 5.4, f: 0.5, spots: 0.45, stripes: 1.1, scale: 12 };
+    const sailPal = { top: 0xa8492a, belly: 0x5a3a28, accent: 0x3e1c10, yBelly: 5.4, yTop: 8.6, f: 0.7, spots: 0.6, scale: 9 };
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
     body.add(skinMesh([place(ell(1.25, 1.4, 3.7, 14), 0, 4.4, 0), place(ell(1.1, 1.2, 1.6, 10), 0, 4.4, -2.9), place(ell(1.0, 1.0, 1.3, 10), 0, 4.8, 3.4)], pal));
     const sail = new THREE.Shape();
@@ -617,17 +971,19 @@
     const hp = withOff(pal, 4.6);
     head.add(skinMesh([
       place(ell(0.7, 0.68, 0.9, 12), 0, 0.15, 0.3),
-      place(tbox(0.55, 0.55, 0.95, 0.85, 3.5), 0, 0.1, 2.2),
+      (() => { const g = frustum(0.3, 0.52, 3.5, 14); g.scale(1, 0.85, 1); return place(g, 0, 0.1, 2.2); })(),
+      place(ell(0.3, 0.27, 0.35, 10), 0, 0.12, 3.9),
       place(ell(0.4, 0.34, 0.5, 8), 0, 0.2, 4.0),
       place(ell(0.28, 0.45, 0.45, 8), 0, 0.85, 0.35),
       ...eyePair(0.5, 0.42, 0.7, 0.15),
       ...teethRow(7, 0.3, -0.42, 0.9, 0.45, 0.32, true),
     ], hp));
     const jaw = new THREE.Group(); jaw.position.set(0, -0.28, 0.4); head.add(jaw);
-    jaw.add(skinMesh([place(tbox(0.48, 0.32, 0.85, 0.5, 3.6), 0, -0.16, 2.0), ...teethRow(6, 0.25, 0.02, 0.9, 0.5, 0.26, false)], hp));
+    jaw.add(skinMesh([(() => { const g = frustum(0.24, 0.45, 3.6, 12); g.scale(1, 0.6, 1); return place(g, 0, -0.16, 2.0); })(), ...teethRow(6, 0.25, 0.02, 0.9, 0.5, 0.26, false)], hp));
     const tail = chain(body, 0, 4.4, -3.9, [
       { len: 1.8, r0: 1.0, r1: 0.85, bend: -0.03 }, { len: 1.8, r0: 0.85, r1: 0.7, bend: -0.02, sx: 0.75, sy: 1.3 }, { len: 1.9, r0: 0.7, r1: 0.55, bend: -0.02, sx: 0.6, sy: 1.5 },
-      { len: 1.9, r0: 0.55, r1: 0.4, bend: 0, sx: 0.55, sy: 1.6 }, { len: 2.0, r0: 0.4, r1: 0.22, bend: 0, sx: 0.5, sy: 1.6 }, { len: 2.0, r0: 0.22, r1: 0.06, bend: 0, sx: 0.5, sy: 1.5 }], pal, true);
+      { len: 1.9, r0: 0.55, r1: 0.4, bend: 0, sx: 0.55, sy: 1.6 }, { len: 2.0, r0: 0.4, r1: 0.22, bend: 0, sx: 0.5, sy: 1.6 }, { len: 2.0, r0: 0.22, r1: 0.06, bend: 0, sx: 0.5, sy: 1.5 }], pal, true,
+      { fin: 1.6, finPal: withOff(sailPal, 0) });
     const legs = [makeLeg(body, 1.15, -0.9, 1.9, 1.75, 0.58, 1.7, pal, { claws: true }), makeLeg(body, -1.15, -0.9, 1.9, 1.75, 0.58, 1.7, pal, { claws: true })];
     makeArm(body, 1.2, 3.9, 2.4, 1.2, 1.0, 0.24, pal, true); makeArm(body, -1.2, 3.9, 2.4, 1.2, 1.0, 0.24, pal, true);
     return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.48, stride: 0.8, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 0.85, headComp: 0.3, name: 'Spinosaurus',
@@ -635,8 +991,8 @@
   }
 
   function buildRaptor() {
-    const pal = { top: 0x8a6538, belly: 0xe2d1a8, accent: 0x33220f, yBelly: 1.05, yTop: 1.75, f: 1.6, stripes: 2.6, spots: 0.2 };
-    const featherPal = { top: 0x2f5878, belly: 0x4d7a9c, accent: 0x1b3448, yBelly: 0, yTop: 3, f: 2.0, spots: 0.3 };
+    const pal = { top: 0x7a5732, belly: 0xcdb98e, accent: 0x2e1f0e, yBelly: 1.05, yTop: 1.75, f: 1.6, stripes: 2.6, spots: 0.2, scale: 32 };
+    const featherPal = { top: 0x4a3826, belly: 0x8a7458, accent: 0x231a10, yBelly: 0, yTop: 3, f: 2.0, stripes: 9, scale: 40 };
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
     body.add(skinMesh([place(ell(0.42, 0.47, 0.95, 12), 0, 1.42, 0), place(ell(0.38, 0.4, 0.55, 10), 0, 1.4, -0.7), place(ell(0.3, 0.3, 0.4, 8), 0, 1.55, 0.85)], pal));
     const neck = chain(body, 0, 1.68, 0.95, [{ len: 0.55, r0: 0.24, r1: 0.19, bend: -1.0 }, { len: 0.55, r0: 0.19, r1: 0.16, bend: 0.75 }], pal, false);
@@ -644,22 +1000,26 @@
     const hp = withOff(pal, 1.55);
     head.add(skinMesh([
       place(ell(0.24, 0.24, 0.32, 10), 0, 0.05, 0.12),
-      place(tbox(0.22, 0.2, 0.36, 0.3, 0.85), 0, 0.02, 0.62),
+      (() => { const g = frustum(0.1, 0.17, 0.85, 12); g.scale(1, 1.1, 1); return place(g, 0, 0.02, 0.62); })(),
+      place(ell(0.1, 0.11, 0.12, 8), 0, 0.02, 1.02),
       ...eyePair(0.19, 0.12, 0.25, 0.06),
       ...teethRow(4, 0.11, -0.1, 0.35, 0.14, 0.1, true),
     ], hp));
-    head.add(skinMesh([place(tbox(0.06, 0.34, 0.03, 0.14, 0.55), 0, 0.3, -0.15, 0.5)], featherPal, skinMat2));
     const jaw = new THREE.Group(); jaw.position.set(0, -0.1, 0.15); head.add(jaw);
-    jaw.add(skinMesh([place(tbox(0.18, 0.1, 0.3, 0.14, 0.8), 0, -0.05, 0.42)], hp));
+    jaw.add(skinMesh([(() => { const g = frustum(0.08, 0.14, 0.8, 10); g.scale(1, 0.55, 1); return place(g, 0, -0.05, 0.42); })()], hp));
     const tail = chain(body, 0, 1.4, -0.95, [
       { len: 0.7, r0: 0.28, r1: 0.2, bend: 0.05 }, { len: 0.7, r0: 0.2, r1: 0.13, bend: 0.02 }, { len: 0.75, r0: 0.13, r1: 0.08, bend: 0 }, { len: 0.8, r0: 0.08, r1: 0.03, bend: 0 }], pal, true);
     const fan = new THREE.Shape(); fan.moveTo(0, 0); fan.lineTo(-0.28, -0.9); fan.quadraticCurveTo(0, -1.15, 0.28, -0.9); fan.closePath();
     tail.pivots[3].add(skinMesh([place(new THREE.ShapeGeometry(fan, 6), 0, 0.02, -0.3, -Math.PI / 2, 0, 0)], featherPal, skinMat2));
-    const legs = [makeLeg(body, 0.3, -0.15, 0.78, 0.7, 0.16, 0.6, pal, { claws: true, kneeRest: 0.35 }), makeLeg(body, -0.3, -0.15, 0.78, 0.7, 0.16, 0.6, pal, { claws: true, kneeRest: 0.35 })];
+    const legs = [makeLeg(body, 0.3, -0.15, 0.78, 0.7, 0.16, 0.6, pal, { claws: true, sickle: true, kneeRest: 0.35 }), makeLeg(body, -0.3, -0.15, 0.78, 0.7, 0.16, 0.6, pal, { claws: true, sickle: true, kneeRest: 0.35 })];
     for (const s of [1, -1]) {
       const arm = makeArm(body, s * 0.4, 1.25, 0.6, 0.4, 0.42, 0.07, pal, true);
-      const f = new THREE.Shape(); f.moveTo(0, 0); f.lineTo(0.05, -0.75); f.quadraticCurveTo(0.35, -0.55, 0.42, -0.1); f.closePath();
-      arm.add(skinMesh([place(new THREE.ShapeGeometry(f, 4), s * 0.02, -0.15, -0.05, 0, s * Math.PI / 2, 0)], featherPal, skinMat2));
+      const wingF = [];
+      for (let j = 0; j < 4; j++) {
+        const f = new THREE.Shape(); f.moveTo(0, 0); f.lineTo(0.04, -0.6 - j * 0.06); f.quadraticCurveTo(0.2 + j * 0.05, -0.5 - j * 0.04, 0.3 + j * 0.04, -0.08); f.closePath();
+        wingF.push(place(new THREE.ShapeGeometry(f, 4), s * (0.02 + j * 0.008), -0.12 - j * 0.07, -0.05 + j * 0.05, 0, s * Math.PI / 2, -s * j * 0.05));
+      }
+      arm.add(skinMesh(wingF, featherPal, skinMat2));
     }
     return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.85, stride: 2.4, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 1.0, headComp: 0.45, name: 'Velociraptor',
       carnivore: true, aggro: 40, threatH: 14, runSpeed: 17, lungeDist: 9, biteH: 12, rear: 0.55, hop: 3.8, headY: 2.0 };
@@ -938,7 +1298,7 @@
   // ------------------------------- Pterosaurs --------------------------------
   const PTERO = {
     quetz: { span: 1.0, neck: 1.0, beak: 3.8, crest: 'quetz', tail: 0, teeth: false, name: 'Quetzalcoatlus',
-      pal: { top: 0x7d5f3e, belly: 0xe2d2ad, accent: 0x3d2b1a, yBelly: -0.6, yTop: 0.6, f: 0.7, spots: 0.4 }, memb: { top: 0x5b3e2c, belly: 0x7a563d, accent: 0x3a2619, yBelly: -1, yTop: 1, f: 0.35, spots: 0.5 } },
+      pal: { top: 0x6e5236, belly: 0xd8c7a0, accent: 0x3d2b1a, yBelly: -0.6, yTop: 0.6, f: 0.7, spots: 0.4, scale: 28 }, memb: { top: 0x55392a, belly: 0x7a563d, accent: 0x2e1d13, yBelly: -1, yTop: 1, f: 0.35, spots: 0.5, stripes: 9, scale: 20 } },
     pteranodon: { span: 0.42, neck: 0.8, beak: 3.2, crest: 'blade', tail: 0, teeth: false, name: 'Pteranodon',
       pal: { top: 0x55636f, belly: 0xe8e4d6, accent: 0x2d363f, yBelly: -0.6, yTop: 0.6, f: 0.7, spots: 0.4 }, memb: { top: 0x3f4a53, belly: 0x5e6b75, accent: 0x262e35, yBelly: -1, yTop: 1, f: 0.35, spots: 0.5 } },
     rhamph: { span: 0.22, neck: 0.5, beak: 2.2, crest: 'none', tail: 7.0, teeth: true, name: 'Rhamphorhynchus',
@@ -964,7 +1324,7 @@
     const legs = [];
     for (const s of [1, -1]) {
       const hip = new THREE.Group(); hip.position.set(s * 0.45, -0.3, -1.6); hip.rotation.x = 1.25; hip.userData.rest = 1.25; g.add(hip);
-      hip.add(skinMesh([place(new THREE.CylinderGeometry(0.1, 0.15, 2.3, 6), 0, -1.15, 0), place(ell(0.16, 0.14, 0.18, 7), 0, 0, 0),
+      hip.add(skinMesh([place(new THREE.CylinderGeometry(0.1, 0.15, 2.3, seg(6)), 0, -1.15, 0), place(ell(0.16, 0.14, 0.18, 7), 0, 0, 0),
         [place(coneZ(0.08, 0.38, 5), 0.1, -2.3, 0.05), 0x2a2420], [place(coneZ(0.08, 0.38, 5), -0.1, -2.3, 0.05), 0x2a2420], [place(coneZ(0.08, 0.38, 5), 0, -2.3, 0.12), 0x2a2420]], pal));
       legs.push(hip);
     }
@@ -997,7 +1357,7 @@
     return { group: g, wings: [right, left], head, neck: neck.pivots, jaw, tail, legs, kind, name: k.name };
   }
 
-  const quetz = buildPterosaur('quetz');
+  HQ = true; const quetz = buildPterosaur('quetz'); HQ = false;
   scene.add(quetz.group);
 
   // ---------------------------------------------------------------------------
@@ -1628,11 +1988,16 @@
     if (d.roarT > 0) d.roarT -= dt;
 
     d.drinkT = approach(d.drinkT, d.drinking ? 1 : 0, dt * 0.6);
-    d.walkT = damp(d.walkT, d.speedNow > 0.3 ? 1 : 0, 5, dt);
-    d.phase += dt * d.speedNow * d.stride;
+    d.walkT = damp(d.walkT, Math.abs(d.speedNow) > 0.3 ? 1 : 0, 5, dt);
+    // Real animals run faster mostly by lengthening their stride, not by moving their legs ever quicker,
+    // so cadence rises less than linearly with speed (keeps a sprinting raptor at ~3 strides a second, not a blur).
+    const cad = d.speedNow * d.stride;
+    d.phase += dt * cad / (1 + 0.025 * Math.abs(cad));
 
     const g = d.group;
-    g.position.set(d.x, terrainH(d.x, d.z) + (d.lungeK || 0) * (d.hop || 0), d.z);
+    const gy = terrainH(d.x, d.z);
+    d.groundY = d.groundY == null || Math.abs(d.groundY - gy) > 4 ? gy : damp(d.groundY, gy, 14, dt);   // ride over bumps smoothly
+    g.position.set(d.x, d.groundY + (d.lungeK || 0) * (d.hop || 0), d.z);
     g.rotation.y = d.yaw;
     const w = d.walkT, lk = d.lungeK || 0;
     for (let i = 0; i < d.legs.length; i++) {
@@ -1648,8 +2013,9 @@
       p.rotation.y = Math.sin(t * 1.4 + d.seed - i * 0.7) * 0.07 * (1 + i * 0.35) + Math.sin(d.phase * 0.5 - i * 0.5) * 0.09 * w;
       p.rotation.x = p.userData.rest + Math.sin(t * 0.9 + d.seed + i * 0.5) * 0.02 + lk * 0.08;
     }
-    d.body.position.y = Math.abs(Math.sin(d.phase)) * 0.12 * w;
-    d.body.rotation.z = Math.sin(d.phase) * 0.03 * w;
+    // smooth vertical bob, twice per stride (once per footfall), and a roll into turns at speed
+    d.body.position.y = (0.5 - 0.5 * Math.cos(d.phase * 2)) * 0.12 * w;
+    d.body.rotation.z = Math.sin(d.phase) * 0.03 * w + (d.lean || 0) * 0.14;
     d.body.rotation.x = -lk * (d.rear || 0);
     if (d.neck.length) {
       const n0 = d.neck[0];
@@ -1706,7 +2072,7 @@
       quetz.group.visible = false;
       let d = player.models[kind];
       if (!d) {
-        const spec = cfg.build();
+        HQ = true; const spec = cfg.build(); HQ = false;
         d = Object.assign({ x: 0, z: 0, yaw: 0, speedNow: 0, phase: 0, walkT: 0, drinkT: 0, drinking: false, roarTimer: 1e9, roarT: 0, lungeT: 0, lungeCd: 0, lungeK: 0, lungeJaw: 0, aim: 0.35, snapped: false, seed: rand(0, 100), hunt: 0 }, spec);
         d.hop = cfg.hop; d.rear = cfg.rear;
         scene.add(d.group);
@@ -1753,16 +2119,18 @@
     if (touch.active) { turn = deadzone(-touch.x); move = deadzone(-touch.y); }
     const actionReq = P.takeoffReq; P.takeoffReq = false;
 
-    // turning is slower at full sprint, like a real animal leaning into a wide arc
+    // turning is slower at full sprint, like a real animal leaning into a wide arc; the turn eases in and out
+    // rather than snapping with the key press
     const speedFrac = Math.min(1, Math.abs(d.speedNow) / cfg.run);
-    d.yaw += turn * cfg.turn * (1 - 0.45 * speedFrac) * dt;
+    d.turnV = damp(d.turnV || 0, turn, 7, dt);
+    d.yaw += d.turnV * cfg.turn * (1 - 0.45 * speedFrac) * dt;
+    d.lean = -d.turnV * speedFrac;
     const want = move > 0.15 ? cfg.run * move : move < -0.15 ? cfg.back * move : 0;
     d.speedNow = damp(d.speedNow, want, want === 0 ? 4 : 2.2, dt);
     forward.set(Math.sin(d.yaw), 0, Math.cos(d.yaw));
     const nx = clamp(d.x + forward.x * d.speedNow * dt, -HALF + 30, HALF - 30), nz = clamp(d.z + forward.z * d.speedNow * dt, -HALF + 30, HALF - 30);
     const nh = terrainH(nx, nz);
     if (nh > cfg.minH && nh < 60) { d.x = nx; d.z = nz; } else d.speedNow = 0;
-    d.phase += Math.abs(d.speedNow) * d.stride * dt;
 
     d.lungeCd = Math.max(0, d.lungeCd - dt);
     if (actionReq && d.lungeT <= 0 && d.lungeCd <= 0) {
@@ -1773,13 +2141,14 @@
     d.aim = 0.35;
     animateDino(d, dt, t, true);
 
-    const gh = terrainH(d.x, d.z);
+    const gh = d.groundY;   // smoothed by animateDino, so the camera doesn't jolt over every bump either
     P.x = d.x; P.z = d.z; P.y = gh + 2; P.yaw = d.yaw; P.speed = Math.abs(d.speedNow);
     takeoffBtn.classList.add('show');
     modeHint.classList.remove('show');
 
     const back = cfg.camBack, height = cfg.camH;
     camTarget.set(d.x - forward.x * back, gh + height, d.z - forward.z * back);
+    camTarget.y = Math.max(camTarget.y, terrainH(camTarget.x, camTarget.z) + 1.6);   // never sink into a hillside behind the animal
     camLook.set(d.x + forward.x * 6, gh + cfg.lookH, d.z + forward.z * 6);
     if (!camInit) { camera.position.copy(camTarget); camLookCur.copy(camLook); camInit = true; }
     camera.position.lerp(camTarget, 1 - Math.exp(-4.5 * dt));
@@ -1836,6 +2205,7 @@
 
     for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > HALF * 1.4) c.position.x = -HALF * 1.4; }
     waterNormal.offset.x += dt * 0.012; waterNormal.offset.y += dt * 0.008;
+    groundCover.update(P.x, P.z, elapsed, camera.position.y - Math.max(terrainH(camera.position.x, camera.position.z), WATER_Y));
 
     sun.position.set(P.x + SUN_DIR.x * 180, P.y + SUN_DIR.y * 180, P.z + SUN_DIR.z * 180);
     sun.target.position.set(P.x, P.y - 20, P.z);
