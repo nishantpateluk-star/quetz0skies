@@ -1531,6 +1531,38 @@
     rhamph: { span: 0.22, neck: 0.5, beak: 2.2, crest: 'none', tail: 7.0, teeth: true, name: 'Rhamphorhynchus',
       pal: { top: 0x7a5a2e, belly: 0xdcc99c, accent: 0x3a2a14, yBelly: -0.6, yTop: 0.6, f: 0.9, spots: 0.4 }, memb: { top: 0x4e3a23, belly: 0x6a5233, accent: 0x2e2114, yBelly: -1, yTop: 1, f: 0.4, spots: 0.5 } },
   };
+  // Wing membrane: thin skin stiffened by fine fibres (actinofibrils) running along the span, with blood vessels
+  // branching back from the bones. Lit from behind, sunlight glows through it.
+  const membTex = makeTex(512, (ctx, s) => {
+    ctx.fillStyle = '#efe8e2'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 260; i++) { const v = rand(0.25, 0.75); ctx.fillStyle = `rgba(${(120 * v) | 0},${(90 * v) | 0},${(70 * v) | 0},${rand(0.03, 0.08)})`; ctx.beginPath(); ctx.ellipse(rand(0, s), rand(0, s), rand(10, 50), rand(6, 26), rand(0, TAU), 0, TAU); ctx.fill(); }
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 230; i++) {   // fibres: fine lines along the span (u), drifting slightly towards the trailing edge
+      const y0 = rand(0, s), drift = rand(8, 26);
+      ctx.strokeStyle = `rgba(60,40,30,${rand(0.06, 0.16)})`; ctx.beginPath(); ctx.moveTo(-10, y0);
+      ctx.bezierCurveTo(s * 0.33, y0 + drift * 0.3, s * 0.66, y0 + drift * 0.8, s + 10, y0 + drift); ctx.stroke();
+    }
+    function vessel(x, y, ang, w, depth) {   // vessels branch from the leading edge (top) back across the membrane
+      const len = rand(30, 70), x2 = x + Math.sin(ang) * len, y2 = y + Math.cos(ang) * len;
+      ctx.strokeStyle = `rgba(110,35,30,${0.26 + w * 0.08})`; ctx.lineWidth = w;
+      ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo((x + x2) / 2 + rand(-8, 8), (y + y2) / 2, x2, y2); ctx.stroke();
+      if (depth < 5 && y2 < s) { vessel(x2, y2, ang + rand(0.15, 0.5), w * 0.72, depth + 1); if (Math.random() < 0.7) vessel(x2, y2, ang - rand(0.15, 0.5), w * 0.65, depth + 1); }
+    }
+    for (let i = 0; i < 9; i++) vessel(rand(0, s), 0, rand(-0.3, 0.3), 3, 0);
+  }, { srgb: true });
+  const membraneMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: membTex, roughness: 0.68, side: THREE.DoubleSide });
+  membraneMat.onBeforeCompile = sh => {
+    sh.uniforms.uSunDir = { value: SUN_DIR }; sh.uniforms.uSunCol = { value: new THREE.Color(1.0, 0.66, 0.42) }; membraneMat.userData.sh = sh;
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWN;')
+      .replace('#include <beginnormal_vertex>', '#include <beginnormal_vertex>\nvWN = mat3(modelMatrix) * objectNormal;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWN; uniform vec3 uSunDir, uSunCol;')
+      .replace('#include <tonemapping_fragment>', `
+        vec3 nW = normalize(vWN) * (gl_FrontFacing ? 1.0 : -1.0);
+        float through = max(0.0, -dot(nW, uSunDir));                      // the sun is on the far side of the membrane
+        gl_FragColor.rgb += diffuseColor.rgb * uSunCol * (0.15 + 0.85 * through) * through * 1.1;
+        #include <tonemapping_fragment>`);
+  };
+
   function buildPterosaur(kind) {
     const k = PTERO[kind];
     const g = new THREE.Group();
@@ -1573,28 +1605,62 @@
       t.pivots[2].add(skinMesh([place(new THREE.ShapeGeometry(vane, 8), 0, 0, -k.tail / 3 + 0.5, 0, -Math.PI / 2, 0)], k.memb, skinMat2));
       tail = t.pivots;
     }
-    function wingGeo(pts) { const s = new THREE.Shape(); s.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) { const p = pts[i]; if (p.length === 4) s.quadraticCurveTo(p[0], p[1], p[2], p[3]); else s.lineTo(p[0], p[1]); } s.closePath(); const geo = new THREE.ShapeGeometry(s, 10); geo.rotateX(-Math.PI / 2); return geo; }
-    const L1 = 4.2, L2 = 6.0;
-    const innerGeo = () => wingGeo([[0, -1.15], [L1, -0.8], [L1, 0.9], [L1 * 0.45, 1.7, 0, 2.2]]);
-    const outerGeo = () => wingGeo([[0, -0.8], [L2 * 0.5, -0.5], [L2, -0.08], [L2, 0.02], [L2 * 0.4, 0.55, 0, 0.9]]);
+    // Wing membranes are built as curved surfaces rather than flat cut-outs. Each is a grid running from the bone at
+    // the leading edge (v = 0) back to the trailing edge (v = 1): it billows upward between the two like a loaded sail,
+    // its trailing edge bows inward between attachment points and carries a tendon, and its uv lets the membrane
+    // texture lay fibres along the span and blood vessels back from the bones. The leading edge sits on the z = 0 line
+    // so that scaling z (used to furl the wings on the ground) folds the membrane in towards the bones.
+    const NU = HQ ? 44 : 18, NV = HQ ? 14 : 6;
+    function membrane(len, chordFn, extra) {
+      const pos = [], uv = [], idx = [], te = [];
+      for (let j = 0; j <= NV; j++) for (let i = 0; i <= NU; i++) {
+        const u = i / NU, v = j / NV, c = chordFn(u);
+        let x = u * len, z = -v * c, y = 0.075 * c * Math.sin(Math.PI * v) - 0.04 * c * v;   // billow, and a slight droop at the trailing edge
+        if (extra) [x, y, z] = extra(u, v, x, y, z);
+        pos.push(x, y, z); uv.push(u, v);
+        if (j === NV) te.push(new THREE.Vector3(x, y, z));
+      }
+      for (let j = 0; j < NV; j++) for (let i = 0; i < NU; i++) { const a = j * (NU + 1) + i, b = a + NU + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx);
+      g.computeVertexNormals();
+      const tendon = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(te), NU, 0.022, 5);
+      return [paint(g, k.memb), paint(tendon, k.memb, new THREE.Color(k.memb.accent).multiplyScalar(0.8))];
+    }
+    function membMesh(parts) { const m = new THREE.Mesh(merge(parts), membraneMat); m.castShadow = true; return m; }
+    const L1 = 4.2, L2 = 6.0, SWEEP = 0.13;
     const bone = (len, keys) => loft(keys.map(([t, w]) => [len * t, 0, w, w * 0.9, w * 0.9]), { radial: 8, sub: 3, cap: 3, c1: 0.7 });
     function buildWing() {
       const root = new THREE.Group(); root.position.set(0.75, 0.3, 1.0);
       const inner = new THREE.Group(); root.add(inner);
-      const innerMemb = skinMesh([innerGeo()], k.memb, skinMat2); inner.add(innerMemb);
-      // humerus and forearm as one sculpted bone with shoulder, elbow and wrist knuckles, and the three small clawed
-      // fingers pterosaurs kept at the wrist
-      const innerParts = [aim(bone(L1 + 0.15, [[0, 0.2], [0.12, 0.15], [0.38, 0.13], [0.46, 0.18], [0.54, 0.13], [0.9, 0.11], [1, 0.19]]), -0.05, 0.03, -1.16, L1, 0, 0.36)];
+      // arm membrane (brachiopatagium): deep at the body, where it runs back to the thigh, narrowing towards the wrist,
+      // with the trailing edge bowed in between; plus the small propatagium in front of the arm, braced by the pteroid
+      const innerParts = membrane(L1, u => lerp(2.65, 1.85, u) - 0.32 * Math.sin(Math.PI * u), (u, v, x, y, z) => [x, y - 0.55 * (1 - u) * (1 - u) * v, z]);
+      const pro = membrane(L1 * 0.92, u => 0.5 * Math.sin(Math.PI * Math.pow(u, 0.8)) + 0.08, (u, v, x, y, z) => [x, y * 0.4, -z]);
+      const innerMemb = membMesh([...innerParts, pro[0]]); inner.add(innerMemb);
+      // humerus and forearm as one sculpted bone with shoulder, elbow and wrist knuckles, a heavy flight-muscle mass
+      // at the shoulder, the pteroid bone, and the three small clawed fingers pterosaurs kept at the wrist
+      const armParts = [aim(bone(L1 + 0.15, [[0, 0.22], [0.12, 0.17], [0.34, 0.14], [0.42, 0.2], [0.5, 0.15], [0.88, 0.11], [1, 0.2]]), -0.05, 0.03, 0, 1, 0, 0),
+        place(ell(0.85, 0.24, 0.36, 14), 0.45, 0.02, -0.1), place(ell(0.5, 0.15, 0.22, 10), 1.35, 0.02, -0.05),
+        aim(bone(0.95, [[0, 0.06], [0.5, 0.035], [1, 0.015]]), L1 - 0.05, 0.02, 0.05, -1, 0, 0.42)];
       for (let i = 0; i < 3; i++) {
         const ang = 0.5 + i * 0.35;
-        innerParts.push(aim(digit(0.32, 0.035, 2, 0.05), L1 + 0.05, 0.0, -0.75, Math.sin(ang) * 0.4, -0.35, Math.cos(ang)));
-        innerParts.push([aim(claw(0.12, 0.025, 1.2), L1 + 0.05 + Math.sin(ang) * 0.12, -0.11, -0.75 + Math.cos(ang) * 0.29, Math.sin(ang) * 0.4, -0.5, Math.cos(ang)), 0x2a2420]);
+        armParts.push(aim(digit(0.32, 0.035, 2, 0.05), L1 + 0.05, 0.0, 0.1, Math.sin(ang) * 0.4, -0.35, Math.cos(ang)));
+        armParts.push([aim(claw(0.12, 0.025, 1.2), L1 + 0.05 + Math.sin(ang) * 0.12, -0.11, 0.1 + Math.cos(ang) * 0.29, Math.sin(ang) * 0.4, -0.5, Math.cos(ang)), 0x2a2420]);
       }
-      inner.add(skinMesh(innerParts, pal));
+      inner.add(skinMesh(armParts, pal));
       const outer = new THREE.Group(); outer.position.set(L1, 0, 0); inner.add(outer);
-      const outerMemb = skinMesh([outerGeo()], k.memb, skinMat2); outer.add(outerMemb);
-      // the enormous fourth finger that carries the outer wing: four phalanges with knuckles, tapering to the tip
-      outer.add(skinMesh([aim(bone(L2 + 0.1, [[0, 0.13], [0.06, 0.1], [0.32, 0.085], [0.35, 0.1], [0.38, 0.08], [0.6, 0.065], [0.63, 0.075], [0.66, 0.06], [0.84, 0.045], [0.87, 0.05], [1, 0.02]]), 0, 0.02, -0.8, L2, 0, 0.72)], pal));
+      const sweep = new THREE.Group(); sweep.rotation.y = SWEEP; outer.add(sweep);   // the wing finger angles back towards its tip
+      // outer membrane (chiropatagium): narrow, tapering to a sharp, slightly back-curved tip
+      const outerMemb = membMesh(membrane(L2, u => 1.85 * Math.pow(1 - u, 0.7) * (1 - 0.12 * Math.sin(Math.PI * u)) + 0.02,
+        (u, v, x, y, z) => [x, y + 0.06 * Math.sin(Math.PI * u), z - 0.35 * u * u * u]));
+      sweep.add(outerMemb);
+      // the enormous fourth finger that carries the outer wing: four phalanges with knuckles, tapering and curving to the tip
+      const finger = aim(bone(L2 + 0.1, [[0, 0.14], [0.06, 0.11], [0.32, 0.085], [0.35, 0.1], [0.38, 0.08], [0.6, 0.065], [0.63, 0.075], [0.66, 0.06], [0.84, 0.045], [0.87, 0.05], [1, 0.018]]), 0, 0.02, 0.02, 1, 0, 0);
+      const fp = finger.attributes.position;
+      for (let i = 0; i < fp.count; i++) { const u = clamp(fp.getX(i) / L2, 0, 1); fp.setY(i, fp.getY(i) + 0.06 * Math.sin(Math.PI * u)); fp.setZ(i, fp.getZ(i) - 0.35 * u * u * u); }
+      finger.computeVertexNormals();
+      sweep.add(skinMesh([finger, place(ell(0.2, 0.17, 0.2, 10), 0, 0.02, 0.02)], pal));
       return { root, inner, outer, membs: [innerMemb, outerMemb] };
     }
     const right = buildWing(); g.add(right.root);
