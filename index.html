@@ -190,6 +190,26 @@
     for (const L of LAKES) { const d = Math.hypot(x - L.x, z - L.z) - L.r; if (d < best) best = d; }
     return best;
   }
+  // Viewing platforms: raised timber decks on rising ground above three of the lakes, each facing the water.
+  // Sites are found by scanning around the lake for high, level ground (the terrain is fixed, so they never move).
+  const VIEWPOINTS = [{ lake: 0, name: 'Brachiosaurus Lookout' }, { lake: 3, name: 'Duckbill Point' }, { lake: 5, name: 'Riverside Overlook' }];
+  for (const v of VIEWPOINTS) {
+    const L = LAKES[v.lake]; let best = null;
+    for (let i = 0; i < 64; i++) for (const k of [1.5, 1.7, 1.9]) {
+      const a = i / 64 * TAU, x = L.x + Math.cos(a) * L.r * k, z = L.z + Math.sin(a) * L.r * k;
+      if (Math.abs(x) > 550 || Math.abs(z) > 550) continue;
+      let hi = -1e9, lo = 1e9, other = false;
+      for (const [ox, oz] of [[0, 0], [7, 7], [-7, 7], [7, -7], [-7, -7]]) { const hh = terrainH(x + ox, z + oz); hi = Math.max(hi, hh); lo = Math.min(lo, hh); }
+      for (const M of LAKES) if (M !== L && Math.hypot(x - M.x, z - M.z) < M.r * 1.6) other = true;
+      if (other || lo < 2.6 || hi > 30) continue;
+      const score = lo * 0.4 - (hi - lo) * 3;
+      if (!best || score > best.score) best = { x, z, a, score };
+    }
+    if (!best) best = { x: L.x - L.r * 1.6, z: L.z, a: Math.PI };
+    Object.assign(v, { x: best.x, z: best.z, ang: best.a, yaw: Math.atan2(L.x - best.x, L.z - best.z), r: 12 });
+  }
+  function nearViewpoint(x, z, pad) { for (const v of VIEWPOINTS) if (Math.hypot(x - v.x, z - v.z) < v.r + (pad || 0)) return v; return null; }
+
   // Height of the rendered terrain mesh (linear across its triangles), which can differ from terrainH by up to
   // half a metre between vertices. Small props use this so they sit exactly on the visible ground.
   const TERRAIN = { SEG: (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) ? 180 : 240, heights: null };
@@ -522,7 +542,7 @@
     for (let i = 0; i < (tries || 40); i++) {
       const x = rand(-extent, extent), z = rand(-extent, extent);
       const h = terrainH(x, z);
-      if (h >= minH && h <= maxH && (!extra || extra(x, z, h))) return { x, z, h };
+      if (h >= minH && h <= maxH && !nearViewpoint(x, z, 3) && (!extra || extra(x, z, h))) return { x, z, h };
     }
     return null;
   }
@@ -607,7 +627,27 @@
       _m.compose(_p.set(s.x, s.h + r * 0.2, s.z), _q, _s.set(r, r * 0.7, r)); rocks.setMatrixAt(i, _m);
       _c.setHSL(0.08, rand(0.04, 0.1), rand(0.4, 0.55)); rocks.setColorAt(i, _c);
     }
-    for (const im of [trunks, cones, rounds, bushes, rocks]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; scene.add(im); }
+    // dead wood: fallen trunks lying across the forest floor, and broken stumps
+    const N_LOG = Math.round(170 * K), N_STUMP = Math.round(130 * K);
+    const deadwood = new THREE.InstancedMesh(trunkGeo, trunkMat, N_LOG + N_STUMP);
+    deadwood.castShadow = true; deadwood.receiveShadow = true;
+    const woodsy = (x, z) => fbm(x * 0.008 + 11, z * 0.008 + 5, 2) > 0.44 && nearestLakeDist(x, z) > 6;
+    for (let i = 0; i < N_LOG; i++) {
+      const s = landSpot(2.4, 40, HALF * 0.74, 60, woodsy) || { x: rand(-500, 500), z: rand(-500, 500), h: 5 };
+      const k = rand(0.9, 1.6), len = rand(5, 13), yaw = rand(0, TAU);
+      const slope = Math.atan2(terrainH(s.x + Math.cos(yaw) * len, s.z - Math.sin(yaw) * len) - s.h, len);   // follow the ground along the trunk
+      _q.setFromEuler(new THREE.Euler(0, yaw, -Math.PI / 2 + slope, 'YXZ'));
+      _m.compose(_p.set(s.x, s.h + 0.3 * k, s.z), _q, _s.set(k, len, k)); deadwood.setMatrixAt(i, _m);
+      _c.setHSL(0.07, rand(0.15, 0.3), rand(0.42, 0.62)); deadwood.setColorAt(i, _c);
+    }
+    for (let i = 0; i < N_STUMP; i++) {
+      const s = landSpot(2.4, 45, HALF * 0.74, 60, woodsy) || { x: rand(-500, 500), z: rand(-500, 500), h: 5 };
+      const k = rand(1.2, 2.2);
+      _q.setFromEuler(new THREE.Euler(rand(-0.08, 0.08), rand(0, TAU), rand(-0.08, 0.08)));
+      _m.compose(_p.set(s.x, s.h - 0.2, s.z), _q, _s.set(k, rand(0.5, 1.6), k)); deadwood.setMatrixAt(N_LOG + i, _m);
+      _c.setHSL(0.07, rand(0.2, 0.35), rand(0.45, 0.7)); deadwood.setColorAt(N_LOG + i, _c);
+    }
+    for (const im of [trunks, cones, rounds, bushes, rocks, deadwood]) { im.instanceMatrix.needsUpdate = true; if (im.instanceColor) im.instanceColor.needsUpdate = true; scene.add(im); }
   })();
 
   // ---------------------------------------------------------------------------
@@ -667,7 +707,7 @@
           const slope = Math.abs(meshH(x + 1.5, z) - meshH(x - 1.5, z)) + Math.abs(meshH(x, z + 1.5) - meshH(x, z - 1.5));
           const patch = fbm(x * 0.045 + ki * 7, z * 0.045 - ki * 3, 2);
           const want = clamp(0.15 + (forestN - 0.42) * 2.2 + (patch - 0.5) * 1.6, 0.04, 1) * (ki === 1 ? 1 + smoothstep(12, 3, nearestLakeDist(x, z)) * 2 : 1);
-          if (h < 1.9 || h > 48 || slope > 2.2 || keep > want) { k.mesh.setMatrixAt(idx, ZERO); continue; }
+          if (h < 1.9 || h > 48 || slope > 2.2 || keep > want || nearViewpoint(x, z, 0.5)) { k.mesh.setMatrixAt(idx, ZERO); continue; }
           _q.setFromAxisAngle(_p.set(0, 1, 0), yaw);
           _m.compose(_p.set(x, h - 0.05, z), _q, _s.set(sz, sz * lerp(0.8, 1.2, lit), sz));
           k.mesh.setMatrixAt(idx, _m);
@@ -1403,6 +1443,65 @@
     return { group: g, body, legs, legPhases: [0, Math.PI, Math.PI, 0], legAmp: 0.26, stride: 0.45, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 0.9, headComp: 0.4, name: 'Diplodocus' };
   }
 
+  // Carnotaurus: a lanky, deep-snouted hunter with bull-like brow horns, rows of bony studs and absurdly small arms
+  function buildCarno() {
+    const pal = { top: 0x8c4a32, belly: 0xd8b89a, accent: 0x3e1f14, yBelly: 3.1, yTop: 5.1, f: 0.7, stripes: 1.1, spots: 0.35 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    const studs = [];
+    for (let i = 0; i < 10; i++) for (const sd of [1, -1]) {
+      const z = 2.3 - i * 0.55, top = Math.max(ellTop(4.25, 0.2, 1.1, 2.2, z), ellTop(4.2, -1.4, 1.0, 1.4, z), ellTop(4.7, 1.8, 0.8, 1.1, z), 3.6);
+      studs.push([place(ell(0.13, 0.11, 0.17, 6), sd * 0.48, top - 0.18, z), 0x5a3020]);
+    }
+    body.add(skinMesh([place(ell(1.0, 1.1, 2.2, 14), 0, 4.25, 0.2), place(ell(0.95, 1.0, 1.4, 12), 0, 4.2, -1.4), place(ell(0.8, 0.8, 1.1, 10), 0, 4.7, 1.8), ...studs], pal));
+    const neck = chain(body, 0, 4.85, 2.2, [{ len: 0.9, r0: 0.72, r1: 0.6, bend: -0.7 }, { len: 0.8, r0: 0.6, r1: 0.55, bend: 0.55 }], pal, false);
+    const head = neck.end; head.rotation.x = 0.15; head.userData.rest = 0.15;
+    const hp = withOff(pal, 5.6);
+    head.add(skinMesh([
+      place(ell(0.6, 0.72, 0.75, 12), 0, 0.14, 0.3),
+      (() => { const g = frustum(0.4, 0.62, 1.3, 12); g.scale(1, 1.3, 1); return place(g, 0, 0.02, 1.0); })(),   // short, deep snout
+      place(ell(0.42, 0.5, 0.42, 10), 0, 0.02, 1.62),
+      [place(coneZ(0.17, 0.62, 7), 0.44, 0.62, 0.42, -1.25, 0.75, 0), 0x6a4a36], [place(coneZ(0.17, 0.62, 7), -0.44, 0.62, 0.42, -1.25, -0.75, 0), 0x6a4a36],
+      ...eyePair(0.5, 0.36, 0.62, 0.13),
+      ...teethRow(5, 0.36, -0.42, 0.75, 0.3, 0.3, true),
+    ], hp));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.36, 0.45); head.add(jaw);
+    jaw.add(skinMesh([(() => { const g = frustum(0.3, 0.5, 1.3, 10); g.scale(1.1, 0.6, 1); return place(g, 0, -0.14, 0.72); })(), ...teethRow(4, 0.3, 0.0, 0.5, 0.3, 0.26, false)], hp));
+    const tail = chain(body, 0, 4.2, -2.6, [
+      { len: 1.6, r0: 0.95, r1: 0.75, bend: -0.04 }, { len: 1.6, r0: 0.75, r1: 0.56, bend: -0.03 }, { len: 1.7, r0: 0.56, r1: 0.38, bend: -0.02 },
+      { len: 1.8, r0: 0.38, r1: 0.22, bend: 0 }, { len: 1.9, r0: 0.22, r1: 0.06, bend: 0 }], pal, true);
+    const legs = [makeLeg(body, 0.9, -0.7, 2.05, 1.95, 0.5, 1.5, pal, { claws: true }), makeLeg(body, -0.9, -0.7, 2.05, 1.95, 0.5, 1.5, pal, { claws: true })];
+    makeArm(body, 0.85, 3.85, 1.9, 0.32, 0.26, 0.12, pal, true); makeArm(body, -0.85, 3.85, 1.9, 0.32, 0.26, 0.12, pal, true);
+    return { group: g, body, legs, legPhases: [0, Math.PI], legAmp: 0.6, stride: 0.8, tail: tail.pivots, neck: neck.pivots, head, jaw, drinkAngle: 0.95, headComp: 0.35, name: 'Carnotaurus',
+      carnivore: true, aggro: 55, threatH: 20, runSpeed: 13.5, lungeDist: 13, biteH: 17, rear: 0.45, hop: 2.0, headY: 5.6 };
+  }
+
+  // Protoceratops: a sheep-sized, beaked frill-head that lives in small herds
+  function buildProto() {
+    const pal = { top: 0xa08458, belly: 0xe0cfa8, accent: 0x5a4428, yBelly: 0.6, yTop: 1.35, f: 1.6, spots: 0.4, stripes: 3, scale: 26 };
+    const frillPal = { top: 0xb87a4a, belly: 0x8a5a3a, accent: 0x5a3a22, yBelly: 0, yTop: 0.7, f: 3, spots: 0.5, scale: 26 };
+    const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
+    body.add(skinMesh([place(ell(0.44, 0.46, 0.95, 12), 0, 0.98, -0.05), place(ell(0.38, 0.4, 0.5, 10), 0, 1.02, 0.5)], pal));
+    const head = new THREE.Group(); head.position.set(0, 1.1, 0.95); head.rotation.x = 0.15; head.userData.rest = 0.15; body.add(head);
+    const hp = withOff(pal, 1.1);
+    head.add(skinMesh([
+      place(ell(0.24, 0.28, 0.32, 12), 0, 0.02, 0.2),
+      (() => { const g = frustum(0.11, 0.21, 0.42, 10); g.scale(0.9, 1.45, 1); return place(g, 0, -0.04, 0.52); })(),
+      [place(coneZ(0.085, 0.2, 8), 0, -0.1, 0.72, 0.45, 0, 0), 0x4a3f33],
+      ...eyePair(0.2, 0.08, 0.28, 0.055, 0x2a1f14),
+    ], hp));
+    const frill = new THREE.Shape(); frill.moveTo(-0.5, 0);
+    for (let i = 0; i <= 16; i++) { const a = Math.PI - (i / 16) * Math.PI; frill.lineTo(Math.cos(a) * 0.5, Math.sin(a) * 0.55); }
+    frill.closePath();
+    head.add(skinMesh([place(new THREE.ShapeGeometry(frill, 2), 0, 0.12, 0.02, -0.55, 0, 0)], frillPal, skinMat2));
+    const jaw = new THREE.Group(); jaw.position.set(0, -0.22, 0.3); head.add(jaw);
+    jaw.add(skinMesh([place(tbox(0.2, 0.1, 0.36, 0.16, 0.42), 0, -0.04, 0.22), [place(coneZ(0.08, 0.14, 6), 0, -0.04, 0.42, -0.4, 0, 0), 0x3a3328]], hp));
+    const tail = chain(body, 0, 1.0, -0.95, [{ len: 0.55, r0: 0.32, r1: 0.22, bend: 0.06, sy: 1.3 }, { len: 0.55, r0: 0.22, r1: 0.06, bend: 0.05, sy: 1.3 }], pal, true);
+    const legs = [
+      makeLeg(body, 0.32, 0.55, 0.34, 0.28, 0.17, 0.3, pal, { kneeRest: 0.12, hooves: true }), makeLeg(body, -0.32, 0.55, 0.34, 0.28, 0.17, 0.3, pal, { kneeRest: 0.12, hooves: true }),
+      makeLeg(body, 0.34, -0.5, 0.38, 0.3, 0.21, 0.36, pal, { kneeRest: 0.12, hooves: true }), makeLeg(body, -0.34, -0.5, 0.38, 0.3, 0.21, 0.36, pal, { kneeRest: 0.12, hooves: true })];
+    return { group: g, body, legs, legPhases: [0, Math.PI, Math.PI, 0], legAmp: 0.45, stride: 2.2, tail: tail.pivots, neck: [], head, jaw, drinkAngle: 0.7, headComp: 0, name: 'Protoceratops' };
+  }
+
   function buildMosa() {
     const pal = { top: 0x2f4a5c, belly: 0xc9d3d6, accent: 0x1b2c38, yBelly: -0.9, yTop: 0.9, f: 0.4, spots: 0.5 };
     const g = new THREE.Group(), body = new THREE.Group(); g.add(body);
@@ -1531,7 +1630,7 @@
       const a = rand(0, TAU), r = Math.sqrt(Math.random()) * radius;
       const x = clamp(cx + Math.cos(a) * r, -560, 560), z = clamp(cz + Math.sin(a) * r, -560, 560);
       const h = terrainH(x, z);
-      if (h >= minH && h < 30) return { x, z };
+      if (h >= minH && h < 30 && !nearViewpoint(x, z, 3)) return { x, z };
     }
     return { x: cx, z: cz };
   }
@@ -1597,6 +1696,37 @@
   // Mosasaurus patrolling the big lake
   { const L = LAKES[0]; const m = placeDino(buildMosa(), L.x + 40, L.z, 0, { role: 'swim', lake: L, swimR: 42, swimA: rand(0, TAU), swimSpeed: 4.5, y: -3.4, breath: rand(0, 22) }); m.group.position.y = -3.4; }
 
+  // --- a second wave: two new species, more herds, and young ones keeping close to their mothers ---
+  const openLand = (fx, fz) => landSpot(2.5, 25, 450, 80, (x, z) => nearestLakeDist(x, z) > 30) || { x: fx, z: fz };
+  function spawnYoung(build, mother, n, k, spread) {
+    for (let i = 0; i < n; i++) {
+      const m = build(); m.group.scale.multiplyScalar(k); m.stride /= k; m.name = 'Young ' + m.name;
+      const off = { x: (i % 2 ? 1 : -1) * rand(0.6, 1) * spread, z: -rand(0.3, 1) * spread };   // beside and a little behind
+      placeDino(m, mother.x + off.x, mother.z + off.z, mother.yaw, { role: 'follower', leader: mother, off, speed: (mother.speed || 3) * 1.3, minH: Math.min(mother.minH, 1.0) });
+    }
+  }
+  // Carnotaurus: two more hunters roaming the open country
+  for (let i = 0; i < 2; i++) { const s = openLand(-200, -120); placeDino(buildCarno(), s.x, s.z, rand(0, TAU), { speed: 5.5 }); }
+  // Protoceratops herds
+  for (let i = 0; i < 2; i++) { const s = openLand(150 - i * 300, 150); spawnHerd(buildProto, s.x, s.z, Math.round(6 * HERD), 3.2, 90, 5); }
+  // second Gallimimus flock, a third raptor pack, a Brachiosaurus herd with a calf, Triceratops with young
+  { const s = openLand(-300, 0); spawnHerd(buildGalli, s.x, s.z, Math.round(7 * HERD), 7.5, 200, 9); }
+  { const s = openLand(250, 50); spawnPack(s.x, s.z, 4); }
+  { const s = openLand(-50, -300); const lead = spawnHerd(buildBrachio, s.x, s.z, 3, 2.4, 120, 13); spawnYoung(buildBrachio, lead, 1, 0.35, 7); }
+  { const s = openLand(300, 200); const lead = spawnHerd(buildTrike, s.x, s.z, 3, 3.2, 100, 7); spawnYoung(buildTrike, lead, 2, 0.4, 4.5); }
+  { const s = openLand(-250, 50); const lead = spawnHerd(buildAnky, s.x, s.z, 2, 2.2, 80, 7); spawnYoung(buildAnky, lead, 1, 0.4, 4); }
+  // something to watch from each viewing platform: animals drinking on the shore just below it
+  {
+    const [v0, v1, v2] = VIEWPOINTS, at = (v, da, k) => shoreSpot(LAKES[v.lake], v.ang + da, k);
+    let s = at(v0, 0.32, 1.12); const bm = placeDino(buildBrachio(), s.x, s.z, s.yaw, { role: 'drinker', drinking: true, timer: rand(3, 6) }); spawnYoung(buildBrachio, bm, 1, 0.35, 6);
+    for (let i = 0; i < 2; i++) { s = at(v0, -0.3 - i * 0.12, 1.1); const st = placeDino(buildStego(), s.x, s.z, s.yaw, { role: 'drinker', drinking: i === 0, timer: rand(2, 5) }); if (i === 0) spawnYoung(buildStego, st, 1, 0.4, 4); }
+    for (let i = 0; i < 4; i++) { s = at(v1, -0.35 + i * 0.16, 1.08); const pm = placeDino(buildPara(), s.x, s.z, s.yaw, { role: 'drinker', drinking: i % 2 === 0, timer: rand(2, 6) }); if (i === 1) spawnYoung(buildPara, pm, 2, 0.4, 4); }
+    { const L = LAKES[v1.lake]; const m = placeDino(buildMosa(), L.x, L.z + 36, 0, { role: 'swim', lake: L, swimR: 36, swimA: rand(0, TAU), swimSpeed: 4, y: -3.4, breath: rand(0, 22) }); m.group.position.y = -3.4; }
+    s = at(v2, -0.3, 1.2); placeDino(buildSpino(), s.x, s.z, s.yaw, { role: 'drinker', drinking: true, timer: rand(3, 6), minH: -2.6 });
+    for (let i = 0; i < 2; i++) { s = at(v2, 0.3 + i * 0.14, 1.08); const tm = placeDino(buildTrike(), s.x, s.z, s.yaw, { role: 'drinker', drinking: i === 1, timer: rand(2, 5) }); if (i === 0) spawnYoung(buildTrike, tm, 1, 0.4, 4); }
+    for (let i = 0; i < 3; i++) { s = at(v2, 0.75 + i * 0.1, 1.06); placeDino(buildProto(), s.x, s.z, s.yaw, { role: 'drinker', drinking: i !== 1, timer: rand(1, 4) }); }
+  }
+
   // ---------------------------------------------------------------------------
   // Pterosaur flocks
   // ---------------------------------------------------------------------------
@@ -1638,14 +1768,26 @@
     return m;
   }
   function wheelGeo(r, w) { const g = new THREE.CylinderGeometry(r, r, w, 14); g.rotateZ(Math.PI / 2); return g; }
+  const SKIN_TONES = [0xf1c8a8, 0xe3b08c, 0xc98d64, 0x9c6642, 0x6e4529, 0xf6d9c2];
+  const SHIRTS = [0x3b6fb6, 0xd9534f, 0x5cb85c, 0xf0ad4e, 0xeeeeea, 0x7a5aa6, 0x2f8f8a, 0xe27d9e, 0x56663f, 0xc9b27a, 0x2b2f3a];
+  const TROUSERS = [0x3a4a6a, 0x5a4a38, 0x2b2b2b, 0xb8a888, 0x6b6e70, 0x40506a, 0x7a6a4a];
+  const HAIR = [0x1e1610, 0x3a2414, 0x6b4a2a, 0xb08850, 0x9a9a96, 0x2a1a10, 0x8a3a1c];
+  const pick = a => a[Math.floor(Math.random() * a.length)];
   function tourist(x, y, z, shirt, hat, standing) {
+    const skin = pick(SKIN_TONES), b = y + (standing ? 0.3 : 0.1);   // waist height
     const parts = [
-      [place(new THREE.BoxGeometry(0.42, standing ? 0.7 : 0.5, 0.28), x, y + (standing ? 0.35 : 0.25), z), shirt],
-      [place(ell(0.15, 0.17, 0.15, 10), x, y + (standing ? 0.9 : 0.68), z), 0xe8b894],
-      [place(new THREE.CylinderGeometry(0.12, 0.13, 0.1, 10), x, y + (standing ? 1.02 : 0.8), z), hat],
-      [place(new THREE.CylinderGeometry(0.24, 0.24, 0.03, 12), x, y + (standing ? 0.96 : 0.74), z), hat],
+      [place(new THREE.CylinderGeometry(0.17, 0.14, 0.5, 10).scale(1, 1, 0.65), x, b + 0.25, z), shirt],   // torso
+      [place(ell(0.2, 0.065, 0.11, 10), x, b + 0.49, z), shirt],                                             // shoulders
+      [place(new THREE.CylinderGeometry(0.045, 0.05, 0.1, 8), x, b + 0.56, z), skin],                        // neck
+      [place(ell(0.095, 0.115, 0.105, 12), x, b + 0.68, z), skin],                                           // head
+      [place(ell(0.02, 0.03, 0.025, 6), x, b + 0.67, z + 0.1), skin],                                        // nose
+      [place(new THREE.CylinderGeometry(0.09, 0.105, 0.09, 12), x, b + 0.81, z), hat], [place(new THREE.CylinderGeometry(0.19, 0.19, 0.015, 16), x, b + 0.765, z), hat],
     ];
-    if (standing) parts.push([place(new THREE.BoxGeometry(0.12, 0.5, 0.12), x + 0.32, y + 0.75, z, 0, 0, -0.5), shirt]);   // waving arm
+    for (const sd of [1, -1]) {
+      const up = standing && sd === 1;   // one arm raised in a wave
+      if (up) parts.push([place(new THREE.CylinderGeometry(0.045, 0.05, 0.55, 8), x + sd * 0.3, b + 0.74, z, 0, 0, -0.4), shirt], [place(ell(0.045, 0.06, 0.035, 8), x + sd * 0.41, b + 1.02, z), skin]);
+      else parts.push([place(new THREE.CylinderGeometry(0.05, 0.045, 0.5, 8), x + sd * 0.23, b + 0.26, z + 0.07, -0.3, 0, sd * 0.1), shirt], [place(ell(0.045, 0.06, 0.035, 8), x + sd * 0.25, b + 0.03, z + 0.15), skin]);
+    }
     return parts;
   }
   function buildJeep(number) {
@@ -1787,6 +1929,241 @@
     const flick = burning ? 0.7 + Math.random() * 0.6 : 0;
     b.flame.scale.set(flick, flick, flick); b.flame.visible = burning;
     b.glow.intensity = burning ? 40 + Math.random() * 30 : 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Viewing platforms: timber decks on stilts with railings, stairs, a shade roof, coin-op viewers,
+  // signboards, and visitors who watch (and point at, photograph, and wave to) whatever is nearest
+  // ---------------------------------------------------------------------------
+  const woodTex = makeTex(256, (ctx, s) => {
+    ctx.fillStyle = '#b48d62'; ctx.fillRect(0, 0, s, s);
+    for (let i = 0; i < 1100; i++) { const v = rand(110, 205); tiledStroke(ctx, s, rand(0, s), rand(0, s), rand(1, 2.5), rand(40, 160), rand(-0.015, 0.015), `rgba(${v | 0},${(v * 0.76) | 0},${(v * 0.54) | 0},${rand(0.12, 0.4)})`); }
+    for (let i = 0; i < 10; i++) { const x = rand(0, s), y = rand(0, s); ctx.fillStyle = 'rgba(70,45,25,0.5)'; ctx.beginPath(); ctx.ellipse(x, y, rand(2, 4), rand(5, 9), 0, 0, TAU); ctx.fill(); }
+  }, { srgb: true });
+  const woodMat = new THREE.MeshStandardMaterial({ map: woodTex, vertexColors: true, roughness: 0.88 });
+  const paintMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.55, metalness: 0.3 });
+  const personMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
+  function canvasTex(w, h, draw) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t;
+  }
+  function signMesh(w, h, title, lines) {
+    const tex = canvasTex(512, Math.round(512 * h / w), (ctx, W, H) => {
+      ctx.fillStyle = '#2e4a2e'; ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = '#e9dfc0'; ctx.lineWidth = 8; ctx.strokeRect(12, 12, W - 24, H - 24);
+      ctx.fillStyle = '#f3ead0'; ctx.textAlign = 'center';
+      ctx.font = `bold ${lines ? 44 : 64}px Georgia, serif`; ctx.fillText(title, W / 2, lines ? 70 : H / 2 + 22);
+      if (lines) { ctx.font = '28px Georgia, serif'; lines.forEach((l, i) => ctx.fillText(l, W / 2, 122 + i * 38)); }
+    });
+    return new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, roughness: 0.75 }));
+  }
+  const B = (w, h, d, x, y, z, rx, ry, rz) => place(new THREE.BoxGeometry(w, h, d), x, y, z, rx, ry, rz);
+  const CY = (r0, r1, h, n, x, y, z, rx, ry, rz) => place(new THREE.CylinderGeometry(r0, r1, h, n || 10), x, y, z, rx, ry, rz);
+  const wrapA = a => ((a + Math.PI) % TAU + TAU) % TAU - Math.PI;
+
+  // A visitor: legs and torso in one mesh, a head that turns to look, and two-jointed arms for pointing,
+  // waving and holding binoculars or a camera up to the face. Faces +z.
+  function buildPerson(child) {
+    const g = new THREE.Group(), skin = pick(SKIN_TONES), shirt = pick(SHIRTS), legC = pick(TROUSERS), shorts = Math.random() < 0.35;
+    const body = [];
+    for (const sd of [1, -1]) {
+      if (shorts) body.push([CY(0.08, 0.075, 0.36, 8, sd * 0.095, 0.7, 0), legC], [CY(0.06, 0.05, 0.46, 8, sd * 0.095, 0.29, 0), skin]);
+      else body.push([CY(0.078, 0.062, 0.84, 8, sd * 0.095, 0.48, 0), legC]);
+      body.push([B(0.11, 0.08, 0.25, sd * 0.095, 0.04, 0.04), pick([0x2a2622, 0x5a4632, 0xe8e4dc])]);
+    }
+    body.push([CY(0.165, 0.155, 0.18, 12, 0, 0.92, 0).scale(1, 1, 0.68), legC]);                       // hips
+    body.push([place(new THREE.CylinderGeometry(0.19, 0.155, 0.56, 12).scale(1, 1, 0.62), 0, 1.22, 0), shirt]);   // torso
+    body.push([place(ell(0.215, 0.075, 0.12, 12), 0, 1.47, 0), shirt], [CY(0.048, 0.055, 0.12, 8, 0, 1.55, 0), skin]);
+    if (Math.random() < 0.35) body.push([B(0.27, 0.36, 0.14, 0, 1.24, -0.17), pick([0x8a3a2a, 0x2f4a6a, 0x4a5a32, 0x333333])]);   // backpack
+    g.add(flatMesh(body, personMat));
+    const head = new THREE.Group(); head.position.set(0, 1.58, 0); g.add(head);
+    const hp = [[place(ell(0.095, 0.118, 0.106, 14), 0, 0.1, 0), skin], [place(ell(0.02, 0.03, 0.026, 6), 0, 0.085, 0.104), skin],
+      [place(ell(0.014, 0.03, 0.022, 6), 0.096, 0.09, -0.005), skin], [place(ell(0.014, 0.03, 0.022, 6), -0.096, 0.09, -0.005), skin],
+      [place(ell(0.012, 0.012, 0.008, 6), 0.035, 0.115, 0.097), 0x1a1410], [place(ell(0.012, 0.012, 0.008, 6), -0.035, 0.115, 0.097), 0x1a1410]];
+    const hair = pick(HAIR), r = Math.random();
+    if (r < 0.3) hp.push([CY(0.092, 0.106, 0.09, 14, 0, 0.225, 0), 0xd9c7a0], [CY(0.2, 0.2, 0.014, 18, 0, 0.19, 0), 0xd9c7a0], [CY(0.108, 0.108, 0.02, 14, 0, 0.2, 0), 0x6b4a2a]);   // safari hat
+    else if (r < 0.5) { const c = pick(SHIRTS); hp.push([place(ell(0.1, 0.07, 0.11, 12), 0, 0.17, -0.005), c], [B(0.15, 0.015, 0.1, 0, 0.17, 0.12), c]); }               // cap
+    else { hp.push([place(ell(0.102, 0.085, 0.112, 12), 0, 0.15, -0.012), hair]); if (r > 0.75) hp.push([B(0.18, 0.22, 0.06, 0, 0.03, -0.075), hair]); }               // hair, sometimes long
+    if (Math.random() < 0.25) hp.push([B(0.11, 0.025, 0.01, 0, 0.115, 0.105), 0x111111]);   // sunglasses
+    head.add(flatMesh(hp, personMat));
+    const binos = flatMesh([[CY(0.022, 0.026, 0.11, 8, 0.032, 0.1, 0.17, Math.PI / 2), 0x1b1b1b], [CY(0.022, 0.026, 0.11, 8, -0.032, 0.1, 0.17, Math.PI / 2), 0x1b1b1b], [B(0.04, 0.02, 0.05, 0, 0.1, 0.17), 0x333333]], personMat);
+    const cam = flatMesh([[B(0.13, 0.085, 0.06, 0, 0.1, 0.15), 0x222222], [CY(0.03, 0.03, 0.06, 10, 0.02, 0.1, 0.2, Math.PI / 2), 0x111111]], personMat);
+    const flash = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffffff }));
+    flash.position.set(-0.04, 0.15, 0.18); cam.add(flash);
+    binos.visible = cam.visible = flash.visible = false; head.add(binos, cam);
+    const arms = [];
+    for (const sd of [1, -1]) {
+      const sh = new THREE.Group(); sh.position.set(sd * 0.215, 1.44, 0); g.add(sh);
+      sh.add(flatMesh([[CY(0.058, 0.05, 0.3, 8, 0, -0.14, 0), shirt]], personMat));
+      const el = new THREE.Group(); el.position.set(0, -0.29, 0); sh.add(el);
+      el.add(flatMesh([[CY(0.046, 0.038, 0.27, 8, 0, -0.13, 0), skin], [place(ell(0.042, 0.06, 0.03, 8), 0, -0.3, 0.01), skin]], personMat));
+      arms.push({ sh, el, sd });
+    }
+    if (child) g.scale.setScalar(0.6);
+    return { group: g, head, arms, binos, cam, flash, hasBinos: Math.random() < 0.5, hasCam: Math.random() < 0.5 };
+  }
+
+  function buildViewpoint(v) {
+    const g = new THREE.Group(); g.position.set(v.x, 0, v.z); g.rotation.y = v.yaw; scene.add(g);
+    v.cs = Math.cos(v.yaw); v.sn = Math.sin(v.yaw);
+    const gAt = (lx, lz) => meshH(v.x + lx * v.cs + lz * v.sn, v.z - lx * v.sn + lz * v.cs);
+    const W = 10, D = 7, hw = W / 2, hd = D / 2;
+    let gMax = -1e9; for (let lx = -hw; lx <= hw; lx += 2.5) for (let lz = -hd; lz <= hd; lz += 1.75) gMax = Math.max(gMax, gAt(lx, lz));
+    const F = gMax + 2.4; v.F = F;
+    const wood = [], metal = [];
+    const LIGHT = 0xf4e8da, MID = 0xd8c4ac, DARK = 0xa48a72;
+    // floor planks (with a hairline gap) on joists and bearers, edged with fascia boards
+    for (let i = 0, n = 16; i < n; i++) wood.push([B(W / n - 0.025, 0.08, D, -hw + (i + 0.5) * W / n, F, 0), [LIGHT, 0xe8dac8, 0xf0e2ce][i % 3]]);
+    for (const z of [-hd + 0.25, 0, hd - 0.25]) wood.push([B(W, 0.28, 0.2, 0, F - 0.18, z), DARK]);
+    wood.push([B(W + 0.16, 0.3, 0.08, 0, F - 0.1, hd + 0.04), MID], [B(W + 0.16, 0.3, 0.08, 0, F - 0.1, -hd - 0.04), MID], [B(0.08, 0.3, D, hw + 0.04, F - 0.1, 0), MID], [B(0.08, 0.3, D, -hw - 0.04, F - 0.1, 0), MID]);
+    // stilts on concrete footings, with diagonal bracing
+    for (const x of [-hw + 0.3, -1.65, 1.65, hw - 0.3]) for (const z of [-hd + 0.3, 0, hd - 0.3]) {
+      const g0 = gAt(x, z), len = F - 0.3 - g0 + 0.3;
+      wood.push([B(0.26, len, 0.26, x, g0 - 0.3 + len / 2, z), DARK]);
+      metal.push([B(0.42, 0.3, 0.42, x, g0 + 0.02, z), 0x9a968c]);
+    }
+    for (const z of [-hd + 0.3, hd - 0.3]) for (const [x0, x1] of [[-hw + 0.3, -1.65], [1.65, hw - 0.3], [-1.65, 1.65]]) {
+      const yT = F - 0.35, yB = Math.max(gAt(x0, z), gAt(x1, z), F - 3.2) + 0.25, dx = x1 - x0, dy = yB - yT;
+      if (yT - yB > 0.6) wood.push([B(Math.hypot(dx, dy), 0.16, 0.08, (x0 + x1) / 2, (yT + yB) / 2, z + (z > 0 ? 0.17 : -0.17), 0, 0, Math.atan2(dy, dx)), DARK]);
+    }
+    // railings: posts, a broad handrail, a bottom rail and close-set balusters
+    const RH = 1.05;
+    function rail(x0, z0, x1, z1) {
+      const len = Math.hypot(x1 - x0, z1 - z0), ry = Math.atan2(x1 - x0, z1 - z0), mx = (x0 + x1) / 2, mz = (z0 + z1) / 2;
+      wood.push([B(0.16, 0.06, len + 0.12, mx, F + RH, mz, 0, ry, 0), LIGHT], [B(0.07, 0.07, len, mx, F + 0.16, mz, 0, ry, 0), MID]);
+      const np = Math.max(1, Math.round(len / 1.3));
+      for (let i = 0; i <= np; i++) wood.push([B(0.13, RH, 0.13, lerp(x0, x1, i / np), F + RH / 2, lerp(z0, z1, i / np)), MID]);
+      for (let tt = 0.14 / len; tt < 1 - 0.05 / len; tt += 0.14 / len) wood.push([B(0.035, RH - 0.14, 0.035, lerp(x0, x1, tt), F + RH / 2 + 0.03, lerp(z0, z1, tt)), MID]);
+    }
+    const sx = 3.0, sw = 1.5;
+    rail(-hw + 0.08, hd - 0.08, hw - 0.08, hd - 0.08);
+    rail(-hw + 0.08, -hd + 0.08, -hw + 0.08, hd - 0.08); rail(hw - 0.08, -hd + 0.08, hw - 0.08, hd - 0.08);
+    rail(-hw + 0.08, -hd + 0.08, sx - sw / 2 - 0.08, -hd + 0.08); rail(sx + sw / 2 + 0.08, -hd + 0.08, hw - 0.08, -hd + 0.08);
+    // stairs down the back to the ground
+    const RUN = 0.28;
+    let n = 10, gB = 0;
+    for (let k = 0; k < 3; k++) { gB = gAt(sx, -hd - n * RUN); n = clamp(Math.round((F - gB) / 0.19), 5, 22); }
+    const rise = (F - gB) / n, zEnd = -hd - n * RUN, sLen = Math.hypot(n * RUN, F - gB), sAng = -Math.atan2(F - gB, n * RUN);
+    for (let i = 1; i < n; i++) wood.push([B(sw, 0.06, RUN + 0.04, sx, F - i * rise, -hd - (i - 0.5) * RUN), LIGHT]);
+    for (const sd of [1, -1]) {
+      wood.push([B(0.08, 0.28, sLen, sx + sd * (sw / 2 + 0.04), (F + gB) / 2 - 0.12, (-hd + zEnd) / 2, sAng), DARK]);
+      wood.push([B(0.07, 0.07, sLen, sx + sd * (sw / 2 + 0.04), (F + gB) / 2 + 0.9, (-hd + zEnd) / 2, sAng), LIGHT]);
+      for (const tt of [0.02, 0.5, 0.98]) wood.push([B(0.1, 0.95, 0.1, sx + sd * (sw / 2 + 0.04), lerp(F, gB, tt) + 0.45, lerp(-hd, zEnd, tt)), MID]);
+    }
+    // mono-pitch shade roof over the back half, on four tall posts, with corrugated sheeting
+    const zB = -hd - 0.45, zF = 1.0, rLen = zF - zB, yRoof = z => F + 2.75 + 0.4 * (z - zB) / rLen, rAng = -Math.atan2(0.4, rLen);
+    for (const x of [-hw + 0.3, hw - 0.3]) for (const z of [-hd + 0.3, 0.55]) { const top = yRoof(z) - 0.12; wood.push([B(0.2, top - F, 0.2, x, (F + top) / 2, z), DARK]); }
+    for (const z of [-hd + 0.3, 0.55]) wood.push([B(W + 0.3, 0.22, 0.14, 0, yRoof(z) - 0.2, z), DARK]);
+    metal.push([B(W + 0.9, 0.05, rLen + 0.1, 0, F + 2.95, (zB + zF) / 2, rAng), 0x4f6e52]);
+    for (let i = 0; i < 26; i++) metal.push([B(0.07, 0.04, rLen + 0.1, -hw - 0.4 + (i + 0.5) * (W + 0.8) / 26, F + 2.99, (zB + zF) / 2, rAng), i % 2 ? 0x5d7d60 : 0x48664b]);
+    metal.push([B(W + 0.95, 0.14, 0.04, 0, yRoof(zF) - 0.03, zF + 0.05), 0x3e5a42]);
+    // bench against the back rail
+    wood.push([B(4.2, 0.06, 0.44, -1.8, F + 0.46, -hd + 0.55), LIGHT], [B(4.2, 0.36, 0.05, -1.8, F + 0.82, -hd + 0.32, -0.12), LIGHT]);
+    for (const x of [-3.7, -1.8, 0.1]) wood.push([B(0.08, 0.44, 0.4, x, F + 0.22, -hd + 0.55), DARK]);
+    const deck = flatMesh(wood, woodMat); deck.receiveShadow = true; g.add(deck);
+    const steel = flatMesh(metal, paintMat); steel.receiveShadow = true; g.add(steel);
+    // coin-operated viewers on the front rail; their heads pan slowly as if someone has just used them
+    v.scopes = [];
+    for (const x of [-2.6, 2.6]) {
+      g.add(flatMesh([[CY(0.06, 0.09, 1.05, 10, x, F + 0.52, hd - 0.6), 0x3d6b4e], [CY(0.2, 0.22, 0.06, 14, x, F + 0.06, hd - 0.6), 0x3d6b4e]], paintMat));
+      const head = new THREE.Group(); head.position.set(x, F + 1.12, hd - 0.6); g.add(head);
+      head.add(flatMesh([[B(0.36, 0.24, 0.34, 0, 0.06, 0), 0x3d6b4e], [B(0.42, 0.08, 0.06, 0, 0.0, 0), 0x2c4e39],
+        [CY(0.06, 0.07, 0.12, 12, 0.08, 0.08, 0.22, Math.PI / 2), 0x222222], [CY(0.06, 0.07, 0.12, 12, -0.08, 0.08, 0.22, Math.PI / 2), 0x222222],
+        [CY(0.035, 0.035, 0.08, 10, 0.08, 0.1, -0.2, Math.PI / 2), 0x151515], [CY(0.035, 0.035, 0.08, 10, -0.08, 0.1, -0.2, Math.PI / 2), 0x151515],
+        [B(0.1, 0.12, 0.02, 0.12, 0.06, -0.175), 0xc9a640]], paintMat));
+      head.userData.seed = rand(0, 100); v.scopes.push(head);
+    }
+    // signboards: a wildlife panel on the side rail and the platform's name at the foot of the stairs
+    const seen = [];
+    for (const d of dinos) if (Math.hypot(d.x - v.x, d.z - v.z) < 240 && !seen.includes(d.name.replace('Young ', '')) && d.name.indexOf('Young') < 0) seen.push(d.name);
+    const info = signMesh(1.8, 0.9, v.name, ['Wildlife often seen from here:', ...seen.slice(0, 4)]);
+    info.position.set(-hw + 0.25, F + 1.35, -0.6); info.rotation.y = Math.PI / 2; info.rotation.x = 0; g.add(info);
+    g.add(flatMesh([[B(0.06, 1.0, 1.9, -hw + 0.2, F + 1.35, -0.6), DARK], [B(0.1, 0.9, 0.1, -hw + 0.2, F + 0.45, -1.4), DARK], [B(0.1, 0.9, 0.1, -hw + 0.2, F + 0.45, 0.2), DARK]], woodMat));
+    const gs = gAt(sx + 1.9, zEnd - 0.6), name = signMesh(1.7, 0.55, v.name);
+    name.position.set(sx + 1.9, gs + 1.55, zEnd - 0.64); name.rotation.y = Math.PI; g.add(name);
+    g.add(flatMesh([[B(1.85, 0.68, 0.06, sx + 1.9, gs + 1.55, zEnd - 0.6), DARK], [B(0.12, 1.9, 0.12, sx + 1.05, gs + 0.95, zEnd - 0.55), DARK], [B(0.12, 1.9, 0.12, sx + 2.75, gs + 0.95, zEnd - 0.55), DARK]], woodMat));
+    // visitors along the front rail, a couple at the side rails, sometimes with children
+    v.people = [];
+    const slots = [-4.3, -3.55, -1.75, -0.95, -0.15, 0.65, 1.55, 3.5, 4.25].sort(() => Math.random() - 0.5);
+    const nFront = LOW ? 3 : 6;
+    for (let i = 0; i < nFront + 2; i++) {
+      const front = i < nFront, child = front ? Math.random() < 0.25 : false;
+      const lx = front ? slots[i] + rand(-0.1, 0.1) : (i % 2 ? 1 : -1) * (hw - 0.55), lz = front ? hd - 0.5 - rand(0, 0.25) : rand(1.2, 2.6);
+      const p = Object.assign(buildPerson(child), { lx, lz, base: front ? rand(-0.2, 0.2) : (i % 2 ? 1 : -1) * Math.PI / 2 * 0.8, turn: 0, pose: 'look', timer: rand(0, 4),
+        pref: Math.floor(Math.random() * 3), seed: rand(0, 100), jumpT: 0, flashT: rand(1, 3), child, armQ: [[0, 0, 0], [0, 0, 0]] });
+      p.group.position.set(lx, F + 0.04, lz); g.add(p.group);
+      v.people.push(p);
+    }
+    v.targets = []; v.focusT = 0; v.near = false;
+  }
+  for (const v of VIEWPOINTS) buildViewpoint(v);
+
+  // arm targets [shoulder forward raise, shoulder sideways (+ = outward), elbow bend] for each pose
+  const POSES = {
+    look: [[0.05, 0.08, -0.15], [0.05, 0.08, -0.15]], lean: [[-0.7, -0.12, -0.75], [-0.7, -0.12, -0.75]],
+    point: [[0.05, 0.08, -0.2], [-1.45, 0.1, -0.05]], binoc: [[-0.95, -0.4, -2.0], [-0.95, -0.4, -2.0]],
+    wave: [[0.05, 0.1, -0.2], [-0.25, 2.5, -0.35]], cheer: [[-0.3, 2.6, -0.3], [-0.3, 2.6, -0.3]],
+  };
+  POSES.photo = POSES.binoc;
+  function choosePose(p, near) {
+    const r = Math.random();
+    if (near) return r < 0.45 ? 'wave' : r < 0.65 ? 'point' : r < 0.85 && p.hasCam ? 'photo' : 'look';
+    return r < 0.28 ? 'look' : r < 0.42 ? 'point' : r < 0.6 && p.hasBinos ? 'binoc' : r < 0.75 && p.hasCam ? 'photo' : 'lean';
+  }
+  function cheerViewpoints() {
+    for (const v of VIEWPOINTS) if (Math.hypot(P.x - v.x, P.z - v.z) < 130) for (const p of v.people) p.jumpT = rand(1.2, 2);
+  }
+  function updateViewpoints(dt, t) {
+    for (const v of VIEWPOINTS) {
+      const dv = Math.hypot(P.x - v.x, P.z - v.z);
+      for (const sc of v.scopes) sc.rotation.y = Math.sin(t * 0.17 + sc.userData.seed) * 0.6;
+      if (dv > 650) continue;
+      v.focusT -= dt;
+      if (v.focusT <= 0) {
+        // what's worth watching: the player if they come close, otherwise the three nearest animals
+        v.focusT = 0.4;
+        v.near = dv < 85 && P.y - terrainH(P.x, P.z) < 60;
+        const c = [];
+        // animals out in front of the deck count as closer than ones behind it
+        for (const d of dinos) { const dd = Math.hypot(d.x - v.x, d.z - v.z); if (dd < 280) c.push([dd * (1.7 - 0.7 * ((d.x - v.x) * v.sn + (d.z - v.z) * v.cs) / Math.max(dd, 1)), d]); }
+        c.sort((a, b) => a[0] - b[0]);
+        v.targets = c.slice(0, 3).map(([, d]) => ({ x: d.x, y: d.group.position.y + (d.headY || 3), z: d.z }));
+        if (!v.targets.length) { const L = LAKES[v.lake]; v.targets.push({ x: L.x, y: 0, z: L.z }); }
+      }
+      for (const p of v.people) {
+        const tgt = v.near ? { x: P.x, y: P.y + (player.kind === 'quetz' ? 0 : 3), z: P.z } : v.targets[Math.min(p.pref, v.targets.length - 1)];
+        p.timer -= dt;
+        if (p.timer <= 0) { p.timer = rand(3, 9); p.pose = choosePose(p, v.near); }
+        const pose = p.jumpT > 0 ? 'cheer' : p.pose;
+        // turn the body part of the way, the head the rest
+        const wx = v.x + p.lx * v.cs + p.lz * v.sn, wz = v.z - p.lx * v.sn + p.lz * v.cs;
+        const rel = wrapA(Math.atan2(tgt.x - wx, tgt.z - wz) - v.yaw - p.base);
+        const aimed = pose === 'point' || pose === 'binoc' || pose === 'photo';
+        p.turn = damp(p.turn, aimed ? clamp(rel, -1.7, 1.7) : clamp(rel * 0.55, -0.9, 0.9), 2.2, dt);
+        p.group.rotation.y = p.base + p.turn;
+        const pitch = clamp(Math.atan2(tgt.y - (v.F + 1.6), Math.max(1, Math.hypot(tgt.x - wx, tgt.z - wz))), -0.5, 0.7);
+        p.head.rotation.y = damp(p.head.rotation.y, clamp(wrapA(rel - p.turn), -1.1, 1.1) + Math.sin(t * 0.6 + p.seed) * 0.07, 5, dt);
+        p.head.rotation.x = damp(p.head.rotation.x, -pitch * (aimed ? 1 : 0.7), 4, dt);
+        const targ = POSES[pose];
+        for (let i = 0; i < 2; i++) {
+          const a = p.arms[i], q = targ[i], sx2 = q[0] - (pose === 'point' && i === 1 ? pitch : 0);
+          a.sh.rotation.x = damp(a.sh.rotation.x, sx2 + Math.sin(t * 0.8 + p.seed + i) * 0.03, 5, dt);
+          a.sh.rotation.z = damp(a.sh.rotation.z, a.sd * q[1], 5, dt);
+          a.el.rotation.x = damp(a.el.rotation.x, q[2], 5, dt);
+          a.el.rotation.z = (pose === 'wave' && i === 1) || pose === 'cheer' ? a.sd * Math.sin(t * 9 + p.seed) * 0.45 : damp(a.el.rotation.z, 0, 6, dt);
+        }
+        const raised = p.arms[0].sh.rotation.x < -0.7;
+        p.binos.visible = pose === 'binoc' && raised; p.cam.visible = pose === 'photo' && raised;
+        p.flashT -= dt;
+        if (p.cam.visible && p.flashT <= 0) { p.flash.visible = true; if (p.flashT < -0.07) { p.flash.visible = false; p.flashT = rand(1.2, 4); } }
+        else if (!p.cam.visible) p.flash.visible = false;
+        // jumping for joy at a roar; children bounce when the player comes close
+        if (p.jumpT > 0) p.jumpT -= dt;
+        const hop = p.jumpT > 0 ? Math.abs(Math.sin(p.jumpT * 7)) * 0.22 : p.child && v.near ? Math.abs(Math.sin(t * 6 + p.seed)) * 0.12 : 0;
+        p.group.position.y = v.F + 0.04 + hop;
+        p.group.rotation.z = Math.sin(t * 0.5 + p.seed) * 0.015;
+      }
+    }
   }
 
   function animateWings(model, flap, flapOuter) {
@@ -2034,7 +2411,9 @@
     const want = Math.atan2(dx, dz);
     d.yaw = angleLerp(d.yaw, want, 1 - Math.exp(-(turnRate || 2.2) * dt));
     d.speedNow = damp(d.speedNow, speed, 3, dt);
-    const nx = d.x + Math.sin(d.yaw) * d.speedNow * dt, nz = d.z + Math.cos(d.yaw) * d.speedNow * dt;
+    let nx = d.x + Math.sin(d.yaw) * d.speedNow * dt, nz = d.z + Math.cos(d.yaw) * d.speedNow * dt;
+    const vp = nearViewpoint(nx, nz, 3);
+    if (vp) { const a = Math.atan2(nx - vp.x, nz - vp.z); nx = vp.x + Math.sin(a) * (vp.r + 3); nz = vp.z + Math.cos(a) * (vp.r + 3); }   // slide round the deck
     const nh = terrainH(nx, nz);
     if (nh < d.minH || nh > 34) { return 'blocked'; }
     d.x = nx; d.z = nz;
@@ -2190,13 +2569,13 @@
     quetz: { name: 'Quetzalcoatlus', action: 'Take off',
       controls: '<div><b>&larr; &rarr;</b> turn</div><div><b>&uarr;</b> climb (flap harder)</div><div><b>&darr;</b> dive (glide)</div><div><b>Space</b> take off</div><div style="opacity:.8;margin-top:4px">Fly low over land to touch down. Stay high near the meat-eaters&hellip;</div>',
       touch: 'Drag the pad: up climbs, down dives, sides turn. Fly low over land to touch down.' },
-    trex: { name: 'Tyrannosaurus rex', build: buildTRex, run: 8.0, back: 1.6, turn: 1.0, camBack: 24, camH: 9.5, lookH: 6, minH: -0.8, hop: 0.5, rear: 0.35, action: 'Roar', scare: 55,
+    trex: { name: 'Tyrannosaurus rex', build: buildTRex, run: 8.0, back: 1.6, turn: 1.0, camBack: 24, camH: 9.5, lookH: 6, minH: -0.8, hop: 0.5, rear: 0.35, action: 'Roar', scare: 55, pad: 3,
       controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Roar near the herds and watch them scatter.</div>',
       touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
-    spino: { name: 'Spinosaurus', build: buildSpino, run: 7.5, back: 1.5, turn: 0.95, camBack: 23, camH: 8.5, lookH: 5, minH: -2.6, hop: 0.6, rear: 0.35, action: 'Roar', scare: 50,
+    spino: { name: 'Spinosaurus', build: buildSpino, run: 7.5, back: 1.5, turn: 0.95, camBack: 23, camH: 8.5, lookH: 5, minH: -2.6, hop: 0.6, rear: 0.35, action: 'Roar', scare: 50, pad: 3.5,
       controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Wade right into the lakes. Roar to scatter the herds.</div>',
       touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
-    raptor: { name: 'Velociraptor', build: buildRaptor, run: 14.0, back: 2.5, turn: 2.2, camBack: 9, camH: 3.4, lookH: 1.8, minH: 0.6, hop: 3.8, rear: 0.5, action: 'Leap', scare: 0,
+    raptor: { name: 'Velociraptor', build: buildRaptor, run: 14.0, back: 2.5, turn: 2.2, camBack: 9, camH: 3.4, lookH: 1.8, minH: 0.6, hop: 3.8, rear: 0.5, action: 'Leap', scare: 0, pad: 1,
       controls: '<div><b>&uarr;</b> sprint</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> leap / bite</div><div style="opacity:.8;margin-top:4px">The big carnivores will still hunt you. Stay quick.</div>',
       touch: 'Drag the pad: up sprints, down backs up, sides turn. Tap Leap to jump.' },
   };
@@ -2277,14 +2656,16 @@
     const want = move > 0.15 ? cfg.run * move : move < -0.15 ? cfg.back * move : 0;
     d.speedNow = damp(d.speedNow, want, want === 0 ? 4 : 2.2, dt);
     forward.set(Math.sin(d.yaw), 0, Math.cos(d.yaw));
-    const nx = clamp(d.x + forward.x * d.speedNow * dt, -HALF + 30, HALF - 30), nz = clamp(d.z + forward.z * d.speedNow * dt, -HALF + 30, HALF - 30);
+    let nx = clamp(d.x + forward.x * d.speedNow * dt, -HALF + 30, HALF - 30), nz = clamp(d.z + forward.z * d.speedNow * dt, -HALF + 30, HALF - 30);
+    const vp = nearViewpoint(nx, nz, cfg.pad);
+    if (vp) { const a = Math.atan2(nx - vp.x, nz - vp.z); nx = vp.x + Math.sin(a) * (vp.r + cfg.pad); nz = vp.z + Math.cos(a) * (vp.r + cfg.pad); }
     const nh = terrainH(nx, nz);
     if (nh > cfg.minH && nh < 60) { d.x = nx; d.z = nz; } else d.speedNow = 0;
 
     d.lungeCd = Math.max(0, d.lungeCd - dt);
     if (actionReq && d.lungeT <= 0 && d.lungeCd <= 0) {
       d.lungeT = 1.0; d.lungeCd = 0.9; d.snapped = false;
-      if (cfg.scare) { d.roarT = 1.6; scareHerds(cfg.scare); shake = 0.5; }
+      if (cfg.scare) { d.roarT = 1.6; scareHerds(cfg.scare); cheerViewpoints(); shake = 0.5; }
     }
     tickLunge(d, dt);
     d.aim = 0.35;
@@ -2325,8 +2706,10 @@
     for (const m of flyers) { const dd = Math.hypot(m.x - P.x, m.y - P.y, m.z - P.z); if (dd < bf) { bf = dd; bestF = m; } }
     const lines = [], onGround = player.kind !== 'quetz';
     let jd = 1e9; for (const j of jeeps) jd = Math.min(jd, Math.hypot(j.x - P.x, j.z - P.z));
+    let vp = null, vd = 1e9; for (const v of VIEWPOINTS) { const dd = Math.hypot(v.x - P.x, v.z - P.z); if (dd < vd) { vd = dd; vp = v; } }
     const bdist = Math.hypot(balloon.group.position.x - P.x, balloon.group.position.y - P.y, balloon.group.position.z - P.z);
     if (hunter) lines.push('<span style="color:#ffb3a0">&#9888; ' + hunter.d.name + ' is hunting you</span>');
+    else if (vd < 50 && vd < bd + 15) lines.push((onGround ? 'Nearby: ' : 'Below: ') + vp.name + ' (' + vp.people.length + ' visitors)');
     else if (jd < 45 && jd < bd) lines.push((onGround ? 'Nearby: ' : 'Below: ') + 'Tour jeep');
     else if (best && bd < (onGround ? 60 : 90)) lines.push((onGround ? 'Nearby: ' : 'Below: ') + best.name);
     if (bdist < 80) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + 'Hot air balloon');
@@ -2351,6 +2734,7 @@
     updateFlyers(dt, elapsed);
     updateJeeps(dt);
     updateBalloon(dt, elapsed);
+    updateViewpoints(dt, elapsed);
 
     for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > HALF * 1.4) c.position.x = -HALF * 1.4; }
     waterNormal.offset.x += dt * 0.012; waterNormal.offset.y += dt * 0.008;
@@ -2374,7 +2758,7 @@
   document.getElementById('loading').style.display = 'none';
   selectCharacter('quetz');
   showSelect(true);
-  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter, jeeps, balloon };
+  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter, jeeps, balloon, VIEWPOINTS };
   frame();
 })();
 </script>
