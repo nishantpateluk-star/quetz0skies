@@ -49,6 +49,30 @@
   #select .hint { margin-top: 20px; font-size: 13px; opacity: .8; }
   @media (max-width: 760px) { #select .card { width: 42vw; min-width: 150px; padding: 12px; } #select .card p { display: none; } #select h2 { font-size: 24px; } }
   #err { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; color: #3a2a1a; background: #f4e7cf; font-size: 18px; text-align: center; padding: 40px; }
+  #vitals { margin-top: 8px; width: 200px; }
+  #vitals .stage { font-size: 12px; opacity: .92; margin-bottom: 3px; }
+  #vitals .bar { display: flex; align-items: center; gap: 7px; margin: 3px 0; font-size: 11px; }
+  #vitals .bar b { width: 50px; font-weight: 600; letter-spacing: .3px; opacity: .92; }
+  #vitals .bar i { flex: 1; height: 7px; background: rgba(0,0,0,.35); border-radius: 4px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,.2) inset; }
+  #vitals .bar s { display: block; height: 100%; width: 100%; border-radius: 4px; }
+  #hpFill { background: linear-gradient(90deg, #c8372e, #ff7a5c); } #foodFill { background: linear-gradient(90deg, #c97a22, #ffc35a); } #stamFill { background: linear-gradient(90deg, #4f9e34, #b8e86a); }
+  #vitals .bar.low s { animation: pulse .55s infinite alternate; }
+  @keyframes pulse { to { opacity: .4; } }
+  #chal { position: absolute; left: 16px; top: 160px; width: 262px; color: #fff; font-size: 12.5px; line-height: 1.45; background: rgba(0,0,0,.28); border-radius: 8px; padding: 8px 12px; text-shadow: 0 1px 3px rgba(0,0,0,.6); pointer-events: none; }
+  #chal h4 { margin: 0 0 4px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; opacity: .85; display: flex; justify-content: space-between; }
+  #chal .c { display: flex; gap: 6px; align-items: baseline; margin: 2px 0; }
+  #chal .tick { width: 13px; flex: none; opacity: .7; } #chal .p { margin-left: auto; padding-left: 8px; opacity: .75; flex: none; font-variant-numeric: tabular-nums; }
+  #chal .c.done { opacity: .6; } #chal .c.done .tick { color: #9be37a; opacity: 1; }
+  #chal.hide { display: none; }
+  #toast { position: absolute; left: 50%; top: 24%; transform: translateX(-50%); color: #fff4cc; font-size: 20px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.75), 0 0 18px rgba(255,190,60,.55); opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #note { position: absolute; left: 50%; top: 31%; transform: translateX(-50%); color: #fff; font-size: 15px; font-weight: 600; text-shadow: 0 1px 5px rgba(0,0,0,.85); opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 1.2s; pointer-events: none; }
+  #roarbtn { position: absolute; left: 150px; bottom: 48px; width: 84px; height: 84px; border-radius: 50%; display: none; align-items: center; justify-content: center; color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,.7); background: radial-gradient(circle, rgba(240,110,70,.7), rgba(220,70,40,.45) 70%, rgba(220,70,40,0) 72%); box-shadow: 0 0 0 2px rgba(255,255,255,.35) inset; touch-action: none; }
+  body.touch #roarbtn.show { display: flex; }
+  #stats .btns { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  #select .life { margin-top: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center; font-size: 14px; }
+  #select .life button { background: rgba(255,255,255,.12); color: #fff; border: 2px solid rgba(255,255,255,.35); border-radius: 18px; padding: 6px 14px; font: inherit; cursor: pointer; }
+  #select .life button.on { border-color: #ffe27a; background: rgba(255,226,122,.2); }
   #loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 22px; background: linear-gradient(#6fb0ee, #c9e3fb); text-shadow: 0 1px 4px rgba(0,0,0,.5); }
 </style>
 </head>
@@ -60,53 +84,66 @@
 <div id="hud">
   <h1 id="title">Quetzalcoatlus</h1>
   <div class="sub">Cretaceous Skies &middot; open world</div>
+  <div id="vitals">
+    <div class="stage" id="stage"></div>
+    <div class="bar" id="hpBar"><b>Health</b><i><s id="hpFill"></s></i></div>
+    <div class="bar" id="foodBar"><b>Food</b><i><s id="foodFill"></s></i></div>
+    <div class="bar" id="stamBar"><b>Stamina</b><i><s id="stamFill"></s></i></div>
+  </div>
 </div>
+<div id="chal"></div>
 <div id="controls"></div>
 <div id="touchhint"></div>
 <div id="modehint"></div>
 <div id="takeoff">Take off</div>
+<div id="roarbtn">Roar</div>
 <div id="stats">
   <div id="altline">Altitude <span id="alt">0</span> m</div>
   <div>Speed <span id="spd">0</span> km/h</div>
   <div id="near" style="opacity:.85"></div>
   <button id="switch">Switch dinosaur</button>
+  <div class="btns"><button id="chalbtn">Challenges</button><button id="mutebtn">Sound: on</button></div>
 </div>
 <div id="select">
   <h2>Choose your dinosaur</h2>
-  <p class="lead">You can switch at any time with the button in the corner or the 1 to 4 keys.</p>
+  <p class="lead">Hunt, fish and scavenge to stay fed. Switch at any time with the button in the corner or the 1 to 4 keys.</p>
   <div class="cards">
     <div class="card" data-kind="quetz">
       <div class="icon">&#x1F985;</div>
       <h3>Quetzalcoatlus</h3>
       <div class="role">Giant pterosaur &middot; flies</div>
-      <p>Soar over the whole world, land anywhere on dry ground and stalk about on all fours. Watch out below.</p>
+      <p>Soar over the whole world, skim the lakes for fish and snatch lizards off the ground. Watch out below.</p>
       <div class="keys"><b>&uarr;&darr;</b> climb / dive <b>&larr;&rarr;</b> turn <b>Space</b> take off</div>
     </div>
     <div class="card" data-kind="trex">
       <div class="icon">&#x1F996;</div>
       <h3>Tyrannosaurus rex</h3>
       <div class="role">Apex predator &middot; ground</div>
-      <p>Twelve metres of muscle. Nothing hunts you. Roar to scatter the herds and snap at anything that gets close.</p>
-      <div class="keys"><b>&uarr;</b> run <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> roar / bite</div>
+      <p>Start as a hatchling and eat your way up to twelve metres of muscle. Sneak up on the herds, then charge.</p>
+      <div class="keys"><b>&uarr;</b> run <b>Shift</b> sneak <b>Space</b> bite <b>R</b> roar</div>
     </div>
     <div class="card" data-kind="spino">
       <div class="icon">&#x1F40A;</div>
       <h3>Spinosaurus</h3>
       <div class="role">Sail-backed river hunter &middot; ground &amp; water</div>
-      <p>Longer than a T. rex and at home in the water. Wade through the lakes, roar to scatter the herds. Nothing hunts you.</p>
-      <div class="keys"><b>&uarr;</b> run <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> roar / bite</div>
+      <p>Longer than a T. rex and at home in the water. Wade into the lakes and snap up fish, or ambush the drinkers.</p>
+      <div class="keys"><b>&uarr;</b> run <b>Shift</b> sneak <b>Space</b> bite <b>R</b> roar</div>
     </div>
     <div class="card" data-kind="raptor">
       <div class="icon">&#x1F426;</div>
       <h3>Velociraptor</h3>
       <div class="role">Fast pack hunter &middot; ground</div>
-      <p>Small, quick and agile. Sprint at 50 km/h and leap. The big carnivores will still come for you.</p>
-      <div class="keys"><b>&uarr;</b> sprint <b>&darr;</b> back up <b>&larr;&rarr;</b> turn <b>Space</b> leap / bite</div>
+      <p>Small, quick and agile. Pounce on prey and cling on. The big carnivores will still come for you.</p>
+      <div class="keys"><b>&uarr;</b> sprint <b>Shift</b> sneak <b>Space</b> pounce <b>R</b> call</div>
     </div>
   </div>
+  <div class="life"><span>Life:</span><button data-life="grow">Grow up from a hatchling</button><button data-life="adult">Play as an adult</button></div>
   <div class="hint">Press Esc to close</div>
 </div>
 <div id="alert"></div>
+<div id="toast"></div>
+<div id="note"></div>
+<div id="fade"></div>
 <div id="dpad">
   <div class="arrow up">&uarr;</div><div class="arrow down">&darr;</div><div class="arrow left">&larr;</div><div class="arrow right">&rarr;</div>
   <div class="knob"></div>
@@ -1675,6 +1712,56 @@
   scene.add(quetz.group);
 
   // ---------------------------------------------------------------------------
+  // Life: body mass, health and the meat an animal carries. Masses are rough adult
+  // figures in tonnes; young ones scale with the cube of their size.
+  // ---------------------------------------------------------------------------
+  const store = {
+    get(k, def) { try { const v = localStorage.getItem('qs-' + k); return v == null ? def : JSON.parse(v); } catch (e) { return def; } },
+    set(k, v) { try { localStorage.setItem('qs-' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+  // voice: how it sounds; def: how a plant-eater fights back; hunts: the heaviest prey a meat-eater goes after
+  const SPECIES = {
+    'Tyrannosaurus rex': { mass: 8, voice: 'roar', hunts: 7 }, 'Spinosaurus': { mass: 7, voice: 'roar', hunts: 1, fisher: true },
+    'Allosaurus': { mass: 2, voice: 'roar', hunts: 3.5 }, 'Carnotaurus': { mass: 1.5, voice: 'roar', hunts: 3 },
+    'Dilophosaurus': { mass: 0.4, voice: 'hiss', hunts: 0.5 }, 'Velociraptor': { mass: 0.03, voice: 'screech', hunts: 0.5 },
+    'Brachiosaurus': { mass: 40, voice: 'rumble' }, 'Diplodocus': { mass: 15, voice: 'rumble', def: 'tail' },
+    'Triceratops': { mass: 6, voice: 'bellow', def: 'charge' }, 'Stegosaurus': { mass: 4, voice: 'bellow', def: 'tail' },
+    'Ankylosaurus': { mass: 5, voice: 'bellow', def: 'tail' }, 'Pachycephalosaurus': { mass: 0.45, voice: 'bellow', def: 'charge' },
+    'Parasaurolophus': { mass: 3, voice: 'honk' }, 'Gallimimus': { mass: 0.4, voice: 'chirp' }, 'Protoceratops': { mass: 0.15, voice: 'chirp' },
+    'Mosasaurus': { mass: 10, voice: 'none' }, 'Quetzalcoatlus': { mass: 0.25, voice: 'squawk' },
+  };
+  const maxHp = mass => 60 * Math.sqrt(mass);
+  const meatOf = mass => 40 * Math.sqrt(mass);
+  const _bx = new THREE.Box3();
+  // footprint of the body in its own frame (half-width, back and front extents, height), for bites and collisions
+  function measureBody(d) {
+    const g = d.group, px = g.position.x, py = g.position.y, pz = g.position.z, ry = g.rotation.y;
+    g.position.set(0, 0, 0); g.rotation.set(0, 0, 0); g.updateMatrixWorld(true);
+    _bx.setFromObject(g);
+    g.position.set(px, py, pz); g.rotation.y = ry; g.updateMatrixWorld(true);
+    d.box = { x: Math.max(-_bx.min.x, _bx.max.x) * 0.8, z0: _bx.min.z, z1: _bx.max.z, y: _bx.max.y };
+  }
+  function initLife(d) {
+    d.base = d.name.replace('Young ', ''); d.k = d.group.scale.x;
+    const sp = SPECIES[d.base] || { mass: 1 };
+    d.mass = sp.mass * d.k * d.k * d.k; d.hp = maxHp(d.mass);
+    Object.assign(d, { aware: 0, senseT: Math.random() * 0.3, flee: 0, fleeN: 0, calmT: 0, defend: 0, hungerT: rand(40, 300), migrateT: rand(60, 420), baseStride: d.stride, headDown: 0, swingK: 0 });
+    d.spawn = { x: d.x, z: d.z, yaw: d.yaw, role: d.role };
+    measureBody(d);
+  }
+  // when a herd's leader dies, the eldest survivor takes over and the rest follow it
+  function joinHerd(lead, m) { lead.herd = lead.herd || { lead, members: [lead] }; lead.herd.members.push(m); m.herd = lead.herd; }
+  function promoteHerd(dead) {
+    const h = dead.herd; if (!h || h.lead !== dead) return;
+    const alive = h.members.filter(m => !m.dead && m !== dead);
+    if (!alive.length) return;
+    const nl = alive.find(m => m.k >= 0.9) || alive[0];
+    if (nl.role === 'follower') { nl.role = 'wander'; nl.home = { x: nl.x, z: nl.z }; nl.roam = dead.roam || 100; nl.state = 'idle'; nl.timer = rand(2, 5); }
+    h.lead = nl;
+    for (const m of alive) if (m !== nl && m.role === 'follower') m.leader = nl;
+  }
+
+  // ---------------------------------------------------------------------------
   // Populate dinosaurs
   // ---------------------------------------------------------------------------
   const dinos = [];
@@ -1688,6 +1775,7 @@
       drinking: false, drinkT: 0, walkT: 0, roarTimer: rand(6, 25), roarT: 0,
       hunt: 0, lungeT: 0, lungeCd: 0, lungeK: 0, lungeJaw: 0, aim: 0, snapped: false,
     }, spec, opts || {});
+    initLife(d);
     dinos.push(d);
     return d;
   }
@@ -1723,7 +1811,7 @@
     const leader = placeDino(buildRaptor(), cx, cz, rand(0, TAU), { speed: 11, roam: 160 });
     for (let i = 1; i < n; i++) {
       const off = { x: rand(-6, 6), z: rand(-6, 6) };
-      placeDino(buildRaptor(), cx + off.x, cz + off.z, leader.yaw, { role: 'follower', leader, off, speed: 12.5 });
+      joinHerd(leader, placeDino(buildRaptor(), cx + off.x, cz + off.z, leader.yaw, { role: 'follower', leader, off, speed: 12.5 }));
     }
   }
   { const s = landSpot(2.5, 25, 450, 80, (x, z) => nearestLakeDist(x, z) > 30) || { x: -100, z: 100 }; spawnPack(s.x, s.z, 4); }
@@ -1736,7 +1824,7 @@
     const leader = placeDino(build(), s0.x, s0.z, rand(0, TAU), { speed, roam, home: { x: cx, z: cz } });
     for (let i = 1; i < n; i++) {
       const off = { x: rand(-spread, spread), z: rand(-spread, spread) };
-      placeDino(build(), s0.x + off.x, s0.z + off.z, leader.yaw, { role: 'follower', leader, off, speed: speed * 1.15 });
+      joinHerd(leader, placeDino(build(), s0.x + off.x, s0.z + off.z, leader.yaw, { role: 'follower', leader, off, speed: speed * 1.15 }));
     }
     return leader;
   }
@@ -1768,7 +1856,7 @@
     for (let i = 0; i < n; i++) {
       const m = build(); m.group.scale.multiplyScalar(k); m.stride /= k; m.name = 'Young ' + m.name;
       const off = { x: (i % 2 ? 1 : -1) * rand(0.6, 1) * spread, z: -rand(0.3, 1) * spread };   // beside and a little behind
-      placeDino(m, mother.x + off.x, mother.z + off.z, mother.yaw, { role: 'follower', leader: mother, off, speed: (mother.speed || 3) * 1.3, minH: Math.min(mother.minH, 1.0) });
+      joinHerd(mother, placeDino(m, mother.x + off.x, mother.z + off.z, mother.yaw, { role: 'follower', leader: mother, off, speed: (mother.speed || 3) * 1.3, minH: Math.min(mother.minH, 1.0) }));
     }
   }
   // Carnotaurus: two more hunters roaming the open country
@@ -1856,9 +1944,9 @@
     }
     return parts;
   }
-  function buildJeep(number) {
+  function buildJeep(number, ranger) {
     const g = new THREE.Group();
-    const SAND = 0xd8bf7a, RED = 0xc0392b, DARK = 0x2b2b2b, GREY = 0x8a8a8a;
+    const SAND = ranger ? 0x56704a : 0xd8bf7a, RED = ranger ? 0xe8e0c4 : 0xc0392b, DARK = 0x2b2b2b, GREY = 0x8a8a8a;
     const body = flatMesh([
       [place(new THREE.BoxGeometry(1.9, 0.62, 4.2), 0, 0.96, 0), SAND],                      // tub
       [place(new THREE.BoxGeometry(1.8, 0.26, 1.5), 0, 1.38, 1.3), SAND],                     // bonnet
@@ -1875,12 +1963,15 @@
       [place(new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8), 0, 1.7, 1.05, -0.25, 0, 0), DARK],                   // windscreen frame post (centre)
       [place(wheelGeo(0.42, 0.26), 0, 1.45, -2.25, 0, Math.PI / 2, 0), DARK], [place(new THREE.CylinderGeometry(0.16, 0.16, 0.3, 10), 0, 1.45, -2.25, Math.PI / 2, 0, 0), GREY],   // spare wheel
       [place(new THREE.BoxGeometry(0.5, 0.3, 0.02), 0.97, 1.05, 0.9), 0xfff5d6], [place(new THREE.BoxGeometry(0.5, 0.3, 0.02), -0.97, 1.05, 0.9), 0xfff5d6],   // number plates
+      ...(ranger ? [...tourist(-0.45, 1.25, 0.3, 0xb59f6a, 0x3f4f2c, false), ...tourist(0.45, 1.25, 0.3, 0xb59f6a, 0x3f4f2c, false), [place(new THREE.BoxGeometry(1.4, 0.06, 0.3), 0, 2.29, -0.3), DARK]] : [
       ...tourist(-0.45, 1.25, 0.3, 0x3b6fb6, 0xd9c7a0, false), ...tourist(0.45, 1.25, 0.3, 0xd9534f, 0x6b4a2a, false),
-      ...tourist(-0.45, 1.25, -0.8, 0x5cb85c, 0xf5f0e0, false), ...tourist(0.45, 1.25, -0.8, 0xf0ad4e, 0x333333, false),
+      ...tourist(-0.45, 1.25, -0.8, 0x5cb85c, 0xf5f0e0, false), ...tourist(0.45, 1.25, -0.8, 0xf0ad4e, 0x333333, false)]),
     ]);
     g.add(body);
     const glass = new THREE.Mesh(place(new THREE.BoxGeometry(1.7, 0.62, 0.05), 0, 1.72, 1.02, -0.25, 0, 0), glassMat);
     g.add(glass);
+    const lights = [];   // the ranger's light bar
+    if (ranger) for (const [x, c] of [[0.38, 0xff2a1a], [-0.38, 0x2a6bff]]) { const m = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.22), new THREE.MeshBasicMaterial({ color: c })); m.position.set(x, 2.39, -0.3); g.add(m); lights.push(m); }
     const wheels = [], pivots = [];
     for (const [x, z, front] of [[0.95, 1.45, true], [-0.95, 1.45, true], [0.95, -1.4, false], [-0.95, -1.4, false]]) {
       const pivot = new THREE.Group(); pivot.position.set(x, 0.45, z); g.add(pivot);
@@ -1888,7 +1979,7 @@
       pivot.add(w); wheels.push(w); if (front) pivots.push(pivot);
     }
     g.rotation.order = 'YXZ';
-    return { group: g, wheels, pivots, body };
+    return { group: g, wheels, pivots, body, lights };
   }
   const jeeps = [];
   function jeepSpot(cx, cz, radius) {
@@ -1913,26 +2004,46 @@
     jeeps.push({ model, x: s.x, z: s.z, yaw: rand(0, TAU), speed: 0, maxSpeed: 9 + i * 0.8, target: null, wait: rand(0, 3), home: { x: s.x, z: s.z }, wheelRot: 0 });
   }
   function updateJeeps(dt) {
+    // tour jeeps bolt when a big meat-eater comes for them; the ranger has its own orders
+    const scary = !life.dead && player.kind !== 'quetz' && playerMass() > 0.25;
+    let chasing = false;
     for (const j of jeeps) {
-      if (!j.target) {
-        j.wait -= dt; j.speed = damp(j.speed, 0, 3, dt);
+      const pd = Math.hypot(P.x - j.x, P.z - j.z);
+      if (j.ranger) rangerBrain(j, dt, pd);
+      else if (scary && j.fleeT <= 0 && pd < 32 && (P.speed > 2 || pd < 16)) { j.fleeT = 9; j.target = null; Sound.scream({ x: j.x, y: 1.5, z: j.z }, 3); }
+      if (j.fleeT > 0) {
+        j.fleeT -= dt;
+        if (!j.target || (j.retarget -= dt) <= 0) {
+          j.retarget = 0.8;
+          const base = Math.atan2(j.x - P.x, j.z - P.z);
+          for (const o of [0, 0.5, -0.5, 1, -1, 1.6, -1.6]) {
+            const a = base + o, x = j.x + Math.sin(a) * 40, z = j.z + Math.cos(a) * 40, h = terrainH(x, z);
+            if (h > 2 && h < 24 && Math.abs(x) < 560 && Math.abs(z) < 560) { j.target = { x, z }; break; }
+          }
+        }
+        if (!j.ranger && pd < 24 && !life.dead) { chasing = true; life.chaseT += dt; challenge('jeep', life.chaseT, 'max'); }
+        if (j.fleeT <= 0) { j.target = null; j.wait = rand(1, 3); }
+      } else if (!j.ranger && !j.target) {
+        j.wait -= dt;
         if (j.wait <= 0) {
           for (let i = 0; i < 15 && !j.target; i++) { const t = jeepSpot(j.home.x, j.home.z, 260); if (t && clearRoute(j.x, j.z, t.x, t.z)) j.target = t; }
           if (!j.target) j.wait = 1;
         }
-      } else {
+      }
+      if (!j.target) j.speed = damp(j.speed, 0, 3, dt);
+      else {
         const dx = j.target.x - j.x, dz = j.target.z - j.z, dist = Math.hypot(dx, dz);
-        const want = Math.atan2(dx, dz);
+        const want = Math.atan2(dx, dz), top = j.maxSpeed * (j.fleeT > 0 ? 1.8 : j.siren ? 1.4 : 1);
         let diff = ((want - j.yaw + Math.PI) % TAU + TAU) % TAU - Math.PI;
         j.yaw = angleLerp(j.yaw, want, 1 - Math.exp(-1.4 * dt));
         const corner = Math.min(1, Math.abs(diff) / 0.9);
-        const targetSpeed = dist < 12 ? Math.max(2, j.maxSpeed * dist / 12) : j.maxSpeed * (1 - 0.6 * corner);
+        const targetSpeed = dist < 12 ? Math.max(2, top * dist / 12) : top * (1 - 0.6 * corner);
         j.speed = damp(j.speed, targetSpeed, 1.6, dt);
         const nx = j.x + Math.sin(j.yaw) * j.speed * dt, nz = j.z + Math.cos(j.yaw) * j.speed * dt;
         const nh = terrainH(nx, nz);
         if (nh < 1.8 || nh > 28) { j.target = null; j.wait = 1.5; j.speed = 0; }
         else { j.x = nx; j.z = nz; }
-        if (dist < 4) { j.target = null; j.wait = rand(2, 8); }
+        if (dist < 4) { j.target = null; j.wait = j.fleeT > 0 || j.siren ? 0 : rand(2, 8); }
         for (const p of j.model.pivots) p.rotation.y = damp(p.rotation.y, clamp(diff, -0.45, 0.45), 6, dt);
       }
       j.wheelRot += j.speed / 0.45 * dt;
@@ -1944,8 +2055,11 @@
       const g = j.model.group;
       g.position.set(j.x, (hF + hB) / 2, j.z);
       g.rotation.set(-Math.atan2(hF - hB, 4), j.yaw, Math.atan2(hL - hR, 2));
+      if (j.hitT > 0) { j.hitT -= dt; g.rotation.z += Math.sin(j.hitT * 40) * 0.1 * j.hitT; }
       j.model.body.position.y = Math.sin(j.wheelRot * 0.7) * 0.015 * Math.min(1, j.speed / 4);
+      if (j.model.lights.length) { const on = Math.floor(elapsed * 5) % 2 === 0; j.model.lights[0].visible = !j.siren || on; j.model.lights[1].visible = !j.siren || !on; }
     }
+    if (!chasing) life.chaseT = 0;
   }
 
   function buildBalloon() {
@@ -2168,7 +2282,7 @@
   const POSES = {
     look: [[0.05, 0.08, -0.15], [0.05, 0.08, -0.15]], lean: [[-0.7, -0.12, -0.75], [-0.7, -0.12, -0.75]],
     point: [[0.05, 0.08, -0.2], [-1.45, 0.1, -0.05]], binoc: [[-0.95, -0.4, -2.0], [-0.95, -0.4, -2.0]],
-    wave: [[0.05, 0.1, -0.2], [-0.25, 2.5, -0.35]], cheer: [[-0.3, 2.6, -0.3], [-0.3, 2.6, -0.3]],
+    wave: [[0.05, 0.1, -0.2], [-0.25, 2.5, -0.35]], cheer: [[-0.3, 2.6, -0.3], [-0.3, 2.6, -0.3]], cower: [[-2.5, 0.35, -2.1], [-2.5, 0.35, -2.1]],
   };
   POSES.photo = POSES.binoc;
   function choosePose(p, near) {
@@ -2177,13 +2291,18 @@
     return r < 0.28 ? 'look' : r < 0.42 ? 'point' : r < 0.6 && p.hasBinos ? 'binoc' : r < 0.75 && p.hasCam ? 'photo' : 'lean';
   }
   function cheerViewpoints() {
-    for (const v of VIEWPOINTS) if (Math.hypot(P.x - v.x, P.z - v.z) < 130) for (const p of v.people) p.jumpT = rand(1.2, 2);
+    for (const v of VIEWPOINTS) if (!v.panicking && Math.hypot(P.x - v.x, P.z - v.z) < 130) { for (const p of v.people) p.jumpT = rand(1.2, 2); Sound.cheer({ x: v.x, y: v.F + 1.5, z: v.z }); }
   }
   function updateViewpoints(dt, t) {
     for (const v of VIEWPOINTS) {
       const dv = Math.hypot(P.x - v.x, P.z - v.z);
       for (const sc of v.scopes) sc.rotation.y = Math.sin(t * 0.17 + sc.userData.seed) * 0.6;
       if (dv > 650) continue;
+      // a big meat-eater right below the rail sends everyone scrambling to the back of the deck
+      const danger = !life.dead && player.kind !== 'quetz' && playerMass() > 0.3 && dv < 24 + 10 * growthOf(player.kind);
+      if (danger) v.panicT = Math.max(v.panicT || 0, 2.5);
+      const was = v.panicking; v.panicT = (v.panicT || 0) - dt; v.panicking = v.panicT > 0;
+      if (v.panicking && !was) { Sound.scream({ x: v.x, y: v.F + 1.5, z: v.z }, 5); if (danger) incident(v.x, v.z, 1); }
       v.focusT -= dt;
       if (v.focusT <= 0) {
         // what's worth watching: the player if they come close, otherwise the three nearest animals
@@ -2200,7 +2319,9 @@
         const tgt = v.near ? { x: P.x, y: P.y + (player.kind === 'quetz' ? 0 : 3), z: P.z } : v.targets[Math.min(p.pref, v.targets.length - 1)];
         p.timer -= dt;
         if (p.timer <= 0) { p.timer = rand(3, 9); p.pose = choosePose(p, v.near); }
-        const pose = p.jumpT > 0 ? 'cheer' : p.pose;
+        const pose = v.panicking ? 'cower' : p.jumpT > 0 ? 'cheer' : p.pose;
+        if (p.backLz == null) { p.backLz = rand(-2.9, -0.8); p.curLz = p.lz; }
+        p.curLz = damp(p.curLz, v.panicking ? p.backLz : p.lz, 2.5, dt); p.group.position.z = p.curLz;
         // turn the body part of the way, the head the rest
         const wx = v.x + p.lx * v.cs + p.lz * v.sn, wz = v.z - p.lx * v.sn + p.lz * v.cs;
         const rel = wrapA(Math.atan2(tgt.x - wx, tgt.z - wz) - v.yaw - p.base);
@@ -2221,13 +2342,14 @@
         const raised = p.arms[0].sh.rotation.x < -0.7;
         p.binos.visible = pose === 'binoc' && raised; p.cam.visible = pose === 'photo' && raised;
         p.flashT -= dt;
-        if (p.cam.visible && p.flashT <= 0) { p.flash.visible = true; if (p.flashT < -0.07) { p.flash.visible = false; p.flashT = rand(1.2, 4); } }
+        if (p.cam.visible && p.flashT <= 0) { if (!p.flash.visible && v.near) onPhoto(v, p); p.flash.visible = true; if (p.flashT < -0.07) { p.flash.visible = false; p.flashT = rand(1.2, 4); } }
         else if (!p.cam.visible) p.flash.visible = false;
         // jumping for joy at a roar; children bounce when the player comes close
         if (p.jumpT > 0) p.jumpT -= dt;
         const hop = p.jumpT > 0 ? Math.abs(Math.sin(p.jumpT * 7)) * 0.22 : p.child && v.near ? Math.abs(Math.sin(t * 6 + p.seed)) * 0.12 : 0;
-        p.group.position.y = v.F + 0.04 + hop;
+        p.group.position.y = v.F + 0.04 + hop - (v.panicking ? 0.12 : 0);
         p.group.rotation.z = Math.sin(t * 0.5 + p.seed) * 0.015;
+        p.group.rotation.x = damp(p.group.rotation.x, v.panicking ? -0.15 : 0, 4, dt);
       }
     }
   }
@@ -2265,9 +2387,9 @@
   // mode: fly -> land (flare & touchdown) -> ground (quadrupedal walk) -> takeoff (crouch, vault, powered climb) -> fly
   const STAND_H = 2.25, GRAV = 9.81, WALK_SPEED = 2.6, BACK_SPEED = 1.0;
   const P = { x: 40, y: 45, z: -330, yaw: 0.0, pitch: 0, bank: 0, speed: 30, flapPhase: 0, flapAmp: 0.4, flapRate: 4.2,
-    mode: 'fly', fold: 0, legOut: 0, walkPhase: 0, walkT: 0, vy: 0, modeT: 0, launched: false, crouch: 0, takeoffReq: false };
+    mode: 'fly', fold: 0, legOut: 0, walkPhase: 0, walkT: 0, vy: 0, modeT: 0, launched: false, crouch: 0, takeoffReq: false, roarReq: false, snatch: 0 };
   const keys = {};
-  window.addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat) P.takeoffReq = true; keys[e.code] = true; if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); });
+  window.addEventListener('keydown', e => { if (e.code === 'Space' && !e.repeat) P.takeoffReq = true; if (e.code === 'KeyR' && !e.repeat) P.roarReq = true; keys[e.code] = true; if (e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault(); });
   window.addEventListener('keyup', e => { keys[e.code] = false; });
   window.addEventListener('blur', () => { for (const k in keys) keys[k] = false; });
 
@@ -2320,7 +2442,10 @@
     let turn = (keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0);
     let climb = (keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0);
     if (touch.active) { turn = deadzone(-touch.x); climb = deadzone(-touch.y); }
-    const takeoffReq = P.takeoffReq; P.takeoffReq = false;
+    const takeoffReq = P.takeoffReq && !life.dead; P.takeoffReq = false; P.roarReq = false;
+    if (life.dead) { turn = 0; climb = P.mode === 'fly' ? -0.6 : 0; }
+    if (life.exhausted && climb > 0) climb = 0;   // too tired to flap: glide
+    life.exert = P.mode === 'fly' ? Math.max(0, climb) : P.mode === 'takeoff' ? 1 : 0;
 
     forward.set(Math.sin(P.yaw), 0, Math.cos(P.yaw));
     let gh = terrainH(P.x, P.z);
@@ -2338,7 +2463,7 @@
       P.y += Math.sin(P.pitch) * P.speed * 1.25 * dt;
       P.x = clamp(P.x, -HALF + 30, HALF - 30); P.z = clamp(P.z, -HALF + 30, HALF - 30);
       gh = terrainH(P.x, P.z);
-      if (overWater) { const floor = WATER_Y + 3.5; if (P.y < floor) { P.y = floor; if (P.pitch < 0) P.pitch = 0; } }
+      if (overWater) { const floor = WATER_Y + (climb < -0.15 ? 2.3 : 3.5); if (P.y < floor) { P.y = floor; if (P.pitch < 0) P.pitch = 0; } }
       else if (P.y - gh < STAND_H + 1.0) { P.mode = 'land'; P.modeT = 0; }   // close to the ground: flare and touch down
       if (P.y > 240) { P.y = 240; if (P.pitch > 0) P.pitch = 0; }
       if (climb > 0.15) { rateT = 4.2 + 3.3 * climb; ampT = 0.42 + 0.36 * climb; }
@@ -2371,7 +2496,7 @@
       P.bank = damp(P.bank, 0, 4, dt);
       P.walkPhase += Math.abs(P.speed) * 1.55 * dt;
       rateT = 0; ampT = 0; foldT = 1; legT = 1;
-      if (takeoffReq) { P.mode = 'takeoff'; P.modeT = 0; P.launched = false; P.vy = 0; }
+      if (takeoffReq) { if (life.stamina < 15) note('Too tired to take off'); else { P.mode = 'takeoff'; P.modeT = 0; P.launched = false; P.vy = 0; life.stamina -= 10; } }
     } else if (P.mode === 'takeoff') {
       // Quadrupedal launch: crouch, vault off the forelimbs, then power upward with deep wingbeats against gravity.
       P.yaw += turn * 0.6 * dt;
@@ -2403,6 +2528,8 @@
     P.flapRate = damp(P.flapRate, rateT, 3, dt);
     P.flapAmp = damp(P.flapAmp, ampT, 3, dt);
     P.flapPhase += P.flapRate * dt;
+    const flapI = Math.floor(P.flapPhase / TAU);
+    if (flapI !== P.flapI) { P.flapI = flapI; if (P.flapAmp > 0.3) Sound.flap(P.flapAmp); }
     const f = P.fold;
     const flap = Math.sin(P.flapPhase) * P.flapAmp + 0.12, flapOuter = Math.sin(P.flapPhase - 0.55) * P.flapAmp * 0.9;
     for (let i = 0; i < 2; i++) {
@@ -2428,12 +2555,15 @@
     // neck rises to the upright, giraffe-like carriage when standing
     quetz.neck[0].rotation.x = lerp(quetz.neck[0].userData.rest, -1.25, f);
     quetz.neck[1].rotation.x = lerp(quetz.neck[1].userData.rest, 0.55, f);
-    quetz.head.rotation.x = lerp(quetz.head.userData.rest + P.pitch * 0.5, 1.0 + Math.sin(P.walkPhase * 2) * 0.03 * P.walkT, f);
+    quetz.head.rotation.x = lerp(quetz.head.userData.rest + P.pitch * 0.5, 1.0 + Math.sin(P.walkPhase * 2) * 0.03 * P.walkT, f)
+      + (P.snatch > 0 ? Math.sin(Math.PI * P.snatch / 0.5) * 0.5 : 0) + (life.eating ? 0.3 + Math.sin(elapsed * 7) * 0.2 : 0);
+    P.snatch = Math.max(0, P.snatch - dt);
+    updateQuetzFeeding(dt, terrainH(P.x, P.z), terrainH(P.x, P.z) < WATER_Y + 0.4);
     quetz.neck[0].rotation.y = P.bank * 0.35 + turn * 0.25 * f;
 
     // on-screen prompts
     const grounded = P.mode === 'ground';
-    modeHint.textContent = grounded ? (document.body.classList.contains('touch') ? 'Tap Take off to launch' : 'Press Space to take off') : (P.mode === 'land' ? 'Touching down…' : '');
+    modeHint.textContent = grounded ? (life.eating ? 'Eating the ' + life.eating.name + '…' : document.body.classList.contains('touch') ? 'Tap Take off to launch' : 'Press Space to take off') : (P.mode === 'land' ? 'Touching down…' : '');
     modeHint.classList.toggle('show', grounded || P.mode === 'land');
     takeoffBtn.classList.toggle('show', grounded);
 
@@ -2474,7 +2604,17 @@
   function moveToward(d, tx, tz, speed, dt, stopDist, turnRate) {
     const dx = tx - d.x, dz = tz - d.z, dist = Math.hypot(dx, dz);
     if (dist < stopDist) { d.speedNow = damp(d.speedNow, 0, 6, dt); return true; }
-    const want = Math.atan2(dx, dz);
+    let want = Math.atan2(dx, dz);
+    // feel ahead for water and cliffs and bear round them, keeping to the side already chosen
+    if (d.role !== 'follower' && dist > 12) {
+      if ((d.steerT = (d.steerT || 0) - dt) <= 0) {
+        d.steerT = 0.4;
+        const ok = a => { const h1 = terrainH(d.x + Math.sin(a) * 8, d.z + Math.cos(a) * 8), h2 = terrainH(d.x + Math.sin(a) * 16, d.z + Math.cos(a) * 16); return h1 >= d.minH && h1 < 34 && h2 >= d.minH && h2 < 34; };
+        if (ok(want)) d.steerOff = 0;
+        else { const sg = (d.steerOff || 0) < 0 ? -1 : 1; d.steerOff = 0; for (const o of [0.5, 1, 1.5, 2.1, 2.7]) { if (ok(want + o * sg)) { d.steerOff = o * sg; break; } if (ok(want - o * sg)) { d.steerOff = -o * sg; break; } } }
+      }
+      want += d.steerOff || 0;
+    }
     d.yaw = angleLerp(d.yaw, want, 1 - Math.exp(-(turnRate || 2.2) * dt));
     d.speedNow = damp(d.speedNow, speed, 3, dt);
     let nx = d.x + Math.sin(d.yaw) * d.speedNow * dt, nz = d.z + Math.cos(d.yaw) * d.speedNow * dt;
@@ -2496,24 +2636,41 @@
       if (!d.snapped && prog >= 0.52) { d.snapped = true; if (onSnap) onSnap(); }
     } else { d.lungeK = 0; d.lungeJaw = 0; }
   }
-  // Which carnivores bother with the player: everything hunts the pterosaur, the big ones hunt a player raptor, nobody hunts a player T. rex.
+  // Which carnivores bother with the player: everything hunts the pterosaur; on the ground, anything at least twice the
+  // player's weight (so a hatchling has plenty of enemies and a grown T. rex none), or anything the player has provoked.
   function huntsPlayer(d) {
+    if (life.dead || d.tiredT > 0) return false;
+    if (d.provoked > 0) return true;
     if (player.kind === 'quetz') return true;
-    if (player.kind === 'raptor') return d.name !== 'Velociraptor' && d.name !== 'Dilophosaurus';
-    return false;
+    if (d.base === CHAR[player.kind].name && growthOf(player.kind) >= 0.5) return false;
+    return d.mass * 0.5 > playerMass();
   }
   function updateHunt(d, dt) {
     d.lungeCd = Math.max(0, d.lungeCd - dt);
-    if (!huntsPlayer(d)) { d.hunt = 0; tickLunge(d, dt); return false; }
+    if (d.tiredT > 0) d.tiredT -= dt;
+    if (!huntsPlayer(d)) { d.hunt = 0; d.chaseT = 0; if (!d.prey && !d.fishSpot) tickLunge(d, dt); return false; }
     const dx = P.x - d.x, dz = P.z - d.z, hd = Math.hypot(dx, dz);
     const gh = terrainH(d.x, d.z), rel = P.y - gh;
-    if (hd < d.aggro && rel < d.threatH) { if (d.hunt <= 0) d.roarT = 1.6; d.hunt = 3.5; }
-    if (d.hunt <= 0) { d.lungeK = 0; d.lungeJaw = 0; return false; }
-    d.hunt -= dt;
-    if (hd > d.lungeDist) { if (moveToward(d, P.x, P.z, d.runSpeed, dt, d.lungeDist, 3.2) === 'blocked') d.speedNow = 0; }
-    else { d.speedNow = damp(d.speedNow, 0, 6, dt); d.yaw = angleLerp(d.yaw, Math.atan2(dx, dz), 1 - Math.exp(-4 * dt)); }
-    if (d.lungeT <= 0 && d.lungeCd <= 0 && hd < d.lungeDist * 1.5 && rel < d.biteH) { d.lungeT = 1.0; d.lungeCd = 2.4; d.snapped = false; }
-    tickLunge(d, dt, () => { if (hd < d.lungeDist * 1.6 && rel < d.biteH * 1.25) alertMsg(d.name + ' snapped at you!'); });
+    const ground = player.kind !== 'quetz' || P.mode === 'ground';
+    const aggro = d.aggro * (player.kind === 'quetz' ? 1 : clamp(0.55 + 0.3 * Math.cbrt(playerMass()), 0.55, 1));   // small animals are harder to spot
+    if (hd < aggro && rel < d.threatH) { if (d.hunt <= 0) { d.roarT = 1.6; d.chaseT = 0; } d.hunt = 3.5; }
+    if (d.hunt <= 0) { if (!d.prey && !d.fishSpot) { d.lungeK = 0; d.lungeJaw = 0; } return false; }
+    d.hunt -= dt; d.chaseT = (d.chaseT || 0) + dt; d.prey = null; d.eating = null; d.fishSpot = null; d.drinking = false;
+    if (d.chaseT > 12 && !(d.provoked > 0)) { d.hunt = 0; d.tiredT = 25; return false; }   // gives up after a long chase
+    const m = mouthOf(d), reach = reachOf(d);
+    const close = ground ? bodyDist(PF, m.x, m.z) < reach * 1.2 : hd < d.lungeDist;
+    if (!close) { if (moveToward(d, P.x, P.z, d.runSpeed, dt, ground ? 0 : d.lungeDist, 3.2) === 'blocked') d.speedNow = 0; }
+    else { d.speedNow = damp(d.speedNow, ground ? Math.max(0, P.speed) * 0.8 : 0, 6, dt); d.yaw = angleLerp(d.yaw, Math.atan2(dx, dz), 1 - Math.exp(-4 * dt)); }
+    const canBite = ground ? bodyDist(PF, m.x, m.z) < reach * 1.6 : hd < d.lungeDist * 1.5 && rel < d.biteH;
+    if (d.lungeT <= 0 && d.lungeCd <= 0 && canBite) { d.lungeT = 1.0; d.lungeCd = 2.4; d.snapped = false; }
+    tickLunge(d, dt, () => {
+      const mm = mouthOf(d), my = (d.groundY || gh) + d.box.y * 0.5, hd2 = Math.hypot(P.x - d.x, P.z - d.z);
+      // small, quick animals often dodge a big predator's bite
+      const dodge = ground ? clamp(0.35 + 0.65 * Math.cbrt(playerMass() / d.mass), 0.35, 1) : 1;
+      const hit = (ground ? bodyDist(PF, mm.x, mm.z) < reach * 1.7 : hd2 < d.lungeDist * 0.9 && P.y - gh < d.biteH * 0.6) && Math.random() < dodge;
+      if (hit) { Sound.bite({ x: mm.x, y: my, z: mm.z }, true); blood(P.x, P.y + 1, P.z, 10); hurtPlayer(45 * Math.sqrt(d.mass), d.x, d.z, 6, d.name + ' bit you!', ground ? 35 : 30); }
+      else { Sound.snap({ x: mm.x, y: my, z: mm.z }); alertMsg(d.name + ' snapped at you!'); }
+    });
     d.aim = clamp(Math.atan2(P.y - (gh + d.headY), Math.max(hd, 1)), -0.2, 1.3);
     return true;
   }
@@ -2537,49 +2694,69 @@
     d.jaw.rotation.x = 0.04 + (b > 0.55 ? smoothstep(0.55, 0.85, b) * 0.6 * (d.breath < 3.5 ? 1 : 1 - smoothstep(3.5, 4.4, d.breath)) : 0);
   }
   function updateDino(d, dt, t) {
+    if (d.dead) { updateCarcass(d, dt); return; }
     if (d.role === 'swim') { updateSwim(d, dt, t); return; }
-    const hunting = d.carnivore ? updateHunt(d, dt) : false;
+    if (d.provoked > 0) d.provoked -= dt;
+    if (!d.carnivore) sense(d, dt);
+    let hunting = false;
+    if (d.carnivore && d.flee <= 0) hunting = updateHunt(d, dt) || updatePredator(d, dt);
+    else if (d.carnivore) { d.hunt = 0; tickLunge(d, dt); }
     if (hunting) {
-      if (d.role === 'drinker') d.drinking = false;
+      if (d.role === 'drinker' && !d.eating && !d.fishSpot) d.drinking = false;
+    } else if (d.defend > 0) {
+      updateDefend(d, dt, t);
     } else if (d.flee > 0) {
-      // scattered by a roar: run away from the player for a few seconds
+      // run directly away from the threat, or along the nearest open bearing if water or a cliff is in the way;
+      // an animal chased again and again tires
       d.flee -= dt; d.drinking = false;
-      // run directly away from the player, or along the nearest open bearing if water or a cliff is in the way
-      const base = Math.atan2(d.x - P.x, d.z - P.z);
+      const F = d.fleeFrom || PF, base = Math.atan2(d.x - F.x, d.z - F.z);
       let dir = base;
       for (const off of [0, 0.7, -0.7, 1.4, -1.4, 2.1, -2.1, Math.PI]) {
         const a = base + off, h = terrainH(d.x + Math.sin(a) * 14, d.z + Math.cos(a) * 14);
         if (h > d.minH + 0.2 && h < 32) { dir = a; break; }
       }
-      const r = moveToward(d, d.x + Math.sin(dir) * 40, d.z + Math.cos(dir) * 40, d.speed * 2.2, dt, 1, 3.5);
+      const tired = Math.max(0.55, 1 - 0.08 * ((d.fleeN || 1) - 1)) * (d.k < 0.9 ? 0.75 : 1);   // the young can't keep up for long
+      const r = moveToward(d, d.x + Math.sin(dir) * 40, d.z + Math.cos(dir) * 40, d.speed * 2.2 * tired, dt, 1, 3.5);
       if (r === 'blocked') d.speedNow *= 0.5;
-      if (d.flee <= 0) { if (d.role === 'drinker') d.role = 'wander'; d.state = 'idle'; d.timer = rand(2, 5); }
+      if (d.mass > 0.3 && d.speedNow > 3 && Math.random() < dt * 2.5 && Math.abs(d.x - P.x) + Math.abs(d.z - P.z) < 260) dustAt(d.x, d.groundY || 0, d.z, d.box.x);
+      if (d.flee <= 0) { if (d.role === 'drinker') { d.role = 'wander'; d.returnT = rand(12, 30); } d.state = 'idle'; d.timer = rand(2, 5); d.fleeFrom = null; }
+    } else if (!d.carnivore && d.aware > 0.45) {
+      // something's out there: stop and stare
+      d.speedNow = damp(d.speedNow, 0, 5, dt); d.drinking = false;
     } else if (d.role === 'drinker') {
       d.timer -= dt;
       if (d.timer <= 0) { d.drinking = !d.drinking; d.timer = d.drinking ? rand(3, 7) : rand(2, 5); }
       d.speedNow = 0;
+      if (d.faceYaw != null) d.yaw = angleLerp(d.yaw, d.faceYaw, 1 - Math.exp(-1.5 * dt));
     } else if (d.role === 'follower') {
       const L = d.leader;
-      const tx = L.x + Math.sin(L.yaw) * d.off.z + Math.cos(L.yaw) * d.off.x;
-      const tz = L.z + Math.cos(L.yaw) * d.off.z - Math.sin(L.yaw) * d.off.x;
-      if (moveToward(d, tx, tz, d.speed, dt, 1.2) === 'blocked') d.speedNow = 0;
+      if (!L || L.dead) { d.role = 'wander'; d.home = { x: d.x, z: d.z }; d.state = 'idle'; d.timer = 1; }
+      else {
+        const tx = L.x + Math.sin(L.yaw) * d.off.z + Math.cos(L.yaw) * d.off.x;
+        const tz = L.z + Math.cos(L.yaw) * d.off.z - Math.sin(L.yaw) * d.off.x;
+        if (moveToward(d, tx, tz, d.speed, dt, 1.2) === 'blocked') d.speedNow = 0;
+      }
     } else {
       if (d.state === 'idle') {
         d.speedNow = damp(d.speedNow, 0, 6, dt);
         d.timer -= dt;
-        if (d.timer <= 0) { pickTarget(d); d.state = 'walk'; }
+        if (d.returnT > 0 && (d.returnT -= dt) <= 0) { d.target = { x: d.spawn.x, z: d.spawn.z }; d.returning = true; d.state = 'walk'; }   // back to its drinking spot
+        else if (!d.carnivore && d.k >= 0.9 && d.spawn.role === 'wander' && (d.migrateT -= dt) <= 0) migrate(d);
+        else if (d.timer <= 0) { pickTarget(d); d.state = 'walk'; }
       } else {
         const r = moveToward(d, d.target.x, d.target.z, d.speed, dt, 2.5);
-        if (r === true || r === 'blocked') { d.state = 'idle'; d.timer = rand(2, 7); if (r === 'blocked') d.speedNow = 0; }
+        if (r === true && d.returning) { d.role = 'drinker'; d.returning = false; d.drinking = true; d.timer = rand(3, 6); d.faceYaw = d.spawn.yaw; }
+        else if (r === true || r === 'blocked') { d.state = 'idle'; d.timer = rand(2, 7); if (r === 'blocked') d.speedNow = 0; if (d.returning) { d.returning = false; d.returnT = 20; } }
       }
     }
-    animateDino(d, dt, t, hunting);
+    animateDino(d, dt, t, hunting || d.defend > 0);
   }
   // Shared skeleton animation for AI dinosaurs and player-controlled ones
   function animateDino(d, dt, t, hunting) {
     d.roarTimer -= dt;
     if (d.roarTimer <= 0) { d.roarT = 1.6; d.roarTimer = rand(8, 30); }
     if (d.roarT > 0) d.roarT -= dt;
+    if (d.roarT > 0 && !d.voiced) { d.voiced = true; voiceOf(d); } else if (d.roarT <= 0) d.voiced = false;
 
     d.drinkT = approach(d.drinkT, d.drinking ? 1 : 0, dt * 0.6);
     d.walkT = damp(d.walkT, Math.abs(d.speedNow) > 0.3 ? 1 : 0, 5, dt);
@@ -2587,11 +2764,13 @@
     // so cadence rises less than linearly with speed (keeps a sprinting raptor at ~3 strides a second, not a blur).
     const cad = d.speedNow * d.stride;
     d.phase += dt * cad / (1 + 0.025 * Math.abs(cad));
+    const stepI = Math.floor(d.phase / Math.PI);
+    if (stepI !== d.stepI) { d.stepI = stepI; if (d.walkT > 0.4) footfall(d); }
 
     const g = d.group;
     const gy = terrainH(d.x, d.z);
     d.groundY = d.groundY == null || Math.abs(d.groundY - gy) > 4 ? gy : damp(d.groundY, gy, 14, dt);   // ride over bumps smoothly
-    g.position.set(d.x, d.groundY + (d.lungeK || 0) * (d.hop || 0), d.z);
+    g.position.set(d.x, d.groundY + (d.lungeK || 0) * (d.hop || 0) + (d.yOff || 0), d.z);
     g.rotation.y = d.yaw;
     const w = d.walkT, lk = d.lungeK || 0;
     for (let i = 0; i < d.legs.length; i++) {
@@ -2604,7 +2783,8 @@
     }
     for (let i = 0; i < d.tail.length; i++) {
       const p = d.tail[i];
-      p.rotation.y = (Math.sin(t * 1.4 + d.seed - i * 0.7) * 0.07 * (1 + i * 0.35) + Math.sin(d.phase * 0.5 - i * 0.5) * 0.09 * w) * (d.tailFlex || 1);   // a raptor's tail is stiffened by bony rods
+      p.rotation.y = (Math.sin(t * 1.4 + d.seed - i * 0.7) * 0.07 * (1 + i * 0.35) + Math.sin(d.phase * 0.5 - i * 0.5) * 0.09 * w) * (d.tailFlex || 1)   // a raptor's tail is stiffened by bony rods
+        + (d.swingK || 0) * 0.32 * (1 + i * 0.3);   // swinging a tail club or spikes at an attacker
       p.rotation.x = p.userData.rest + Math.sin(t * 0.9 + d.seed + i * 0.5) * 0.02 + lk * 0.08;
     }
     // smooth vertical bob, twice per stride (once per footfall), and a roll into turns at speed
@@ -2613,11 +2793,13 @@
     d.body.rotation.x = -lk * (d.rear || 0);
     if (d.neck.length) {
       const n0 = d.neck[0];
-      const look = hunting ? 0 : Math.sin(t * 0.6 + d.seed) * 0.28 * (1 - 0.6 * w) * (1 - d.drinkT);
+      let look = hunting ? 0 : Math.sin(t * 0.6 + d.seed) * 0.28 * (1 - 0.6 * w) * (1 - d.drinkT);
+      if ((d.aware > 0.35 || d.defend > 0) && d.lookX != null) look = clamp(wrapA(Math.atan2(d.lookX - d.x, d.lookZ - d.z) - d.yaw), -1, 1) * 0.6;   // staring at the threat
+      d.headDownK = damp(d.headDownK || 0, d.headDown || 0, 4, dt);   // horns lowered to charge
       n0.rotation.y = look;
-      n0.rotation.x = n0.userData.rest + d.drinkT * d.drinkAngle + Math.sin(t * 1.1 + d.seed) * 0.02 - lk * (d.aim * 0.8 + 0.3);
+      n0.rotation.x = n0.userData.rest + (d.drinkT + d.headDownK * 0.5) * d.drinkAngle + Math.sin(t * 1.1 + d.seed) * 0.02 - lk * (d.aim * 0.8 + 0.3);
       for (let i = 1; i < d.neck.length; i++) d.neck[i].rotation.x = d.neck[i].userData.rest + d.drinkT * d.drinkAngle * 0.15 - lk * d.aim * 0.15;
-      d.head.rotation.x = d.head.userData.rest - d.drinkT * d.headComp - lk * 0.15;
+      d.head.rotation.x = d.head.userData.rest - (d.drinkT + d.headDownK * 0.5) * d.headComp - lk * 0.15;
       d.head.rotation.y = look * 0.5;
     } else {
       d.head.rotation.x = d.head.userData.rest + d.drinkT * d.drinkAngle;
@@ -2625,7 +2807,9 @@
     }
     if (d.drinkT > 0.9) d.head.rotation.x += Math.sin(t * 2.5 + d.seed) * 0.04;
     const roar = d.roarT > 0 ? Math.sin(Math.PI * (1 - d.roarT / 1.6)) : 0;
-    d.jaw.rotation.x = 0.03 + Math.max(roar * 0.42, (d.lungeJaw || 0) * 0.85) + (d.drinkT > 0.9 ? 0.06 + Math.sin(t * 3 + d.seed) * 0.05 : 0);
+    const chomp = d.chomp || (d.eating && d.drinking);   // tearing at a carcass rather than lapping water
+    d.jaw.rotation.x = 0.03 + Math.max(roar * 0.42, (d.lungeJaw || 0) * 0.85) + (d.drinkT > 0.9 ? (chomp ? 0.12 + Math.abs(Math.sin(t * 5 + d.seed)) * 0.3 : 0.06 + Math.sin(t * 3 + d.seed) * 0.05) : 0);
+    if (chomp && d.drinkT > 0.9) d.head.rotation.x += Math.sin(t * 2.5 + d.seed) * 0.08;
   }
 
   // ---------------------------------------------------------------------------
@@ -2633,17 +2817,17 @@
   // ---------------------------------------------------------------------------
   const CHAR = {
     quetz: { name: 'Quetzalcoatlus', action: 'Take off',
-      controls: '<div><b>&larr; &rarr;</b> turn</div><div><b>&uarr;</b> climb (flap harder)</div><div><b>&darr;</b> dive (glide)</div><div><b>Space</b> take off</div><div style="opacity:.8;margin-top:4px">Fly low over land to touch down. Stay high near the meat-eaters&hellip;</div>',
-      touch: 'Drag the pad: up climbs, down dives, sides turn. Fly low over land to touch down.' },
-    trex: { name: 'Tyrannosaurus rex', build: buildTRex, run: 8.0, back: 1.6, turn: 1.0, camBack: 24, camH: 9.5, lookH: 6, minH: -0.8, hop: 0.5, rear: 0.35, action: 'Roar', scare: 55, pad: 3,
-      controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Roar near the herds and watch them scatter.</div>',
-      touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
-    spino: { name: 'Spinosaurus', build: buildSpino, run: 7.5, back: 1.5, turn: 0.95, camBack: 23, camH: 8.5, lookH: 5, minH: -2.6, hop: 0.6, rear: 0.35, action: 'Roar', scare: 50, pad: 3.5,
-      controls: '<div><b>&uarr;</b> run</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> roar / bite</div><div style="opacity:.8;margin-top:4px">Wade right into the lakes. Roar to scatter the herds.</div>',
-      touch: 'Drag the pad: up runs, down backs up, sides turn. Tap Roar to scatter the herds.' },
-    raptor: { name: 'Velociraptor', build: buildRaptor, run: 14.0, back: 2.5, turn: 2.2, camBack: 9, camH: 3.4, lookH: 1.8, minH: 0.6, hop: 3.8, rear: 0.5, action: 'Leap', scare: 0, pad: 1,
-      controls: '<div><b>&uarr;</b> sprint</div><div><b>&darr;</b> back up</div><div><b>&larr; &rarr;</b> turn</div><div><b>Space</b> leap / bite</div><div style="opacity:.8;margin-top:4px">The big carnivores will still hunt you. Stay quick.</div>',
-      touch: 'Drag the pad: up sprints, down backs up, sides turn. Tap Leap to jump.' },
+      controls: '<div><b>&larr; &rarr;</b> turn</div><div><b>&uarr;</b> climb (flap harder)</div><div><b>&darr;</b> dive (glide)</div><div><b>Space</b> take off</div><div style="opacity:.8;margin-top:4px">Dive low over a lake to skim for fish, swoop over<br>the grass for lizards. Stay high near the meat-eaters&hellip;</div>',
+      touch: 'Drag the pad: up climbs, down dives, sides turn. Skim the lakes for fish, swoop low for lizards.' },
+    trex: { name: 'Tyrannosaurus rex', build: buildTRex, run: 8.0, back: 1.6, turn: 1.0, camBack: 24, camH: 9.5, lookH: 6, minH: -0.8, hop: 0.5, rear: 0.35, action: 'Bite', roar: 'Roar', scare: 55, pad: 3,
+      controls: '<div><b>&uarr;</b> run &nbsp;<b>Shift</b> sneak</div><div><b>&darr;</b> back up &nbsp;<b>&larr; &rarr;</b> turn</div><div><b>Space</b> bite &nbsp;<b>R</b> roar</div><div style="opacity:.8;margin-top:4px">Sneak close, then charge. Stand still at a kill to eat,<br>at the water\'s edge to drink.</div>',
+      touch: 'Drag the pad to move (a gentle push sneaks). Stand still at a kill to eat, at the water to drink.' },
+    spino: { name: 'Spinosaurus', build: buildSpino, run: 7.5, back: 1.5, turn: 0.95, camBack: 23, camH: 8.5, lookH: 5, minH: -2.6, hop: 0.6, rear: 0.35, action: 'Bite', roar: 'Roar', scare: 50, pad: 3.5,
+      controls: '<div><b>&uarr;</b> run &nbsp;<b>Shift</b> sneak</div><div><b>&darr;</b> back up &nbsp;<b>&larr; &rarr;</b> turn</div><div><b>Space</b> bite &nbsp;<b>R</b> roar</div><div style="opacity:.8;margin-top:4px">Wade into the lakes and bite to catch fish.<br>Stand still at a kill to eat.</div>',
+      touch: 'Drag the pad to move (a gentle push sneaks). Wade into a lake and bite to catch fish.' },
+    raptor: { name: 'Velociraptor', build: buildRaptor, run: 14.0, back: 2.5, turn: 2.2, camBack: 9, camH: 3.4, lookH: 1.8, minH: 0.6, hop: 3.8, rear: 0.5, action: 'Pounce', roar: 'Call', scare: 15, pad: 1,
+      controls: '<div><b>&uarr;</b> sprint &nbsp;<b>Shift</b> sneak</div><div><b>&darr;</b> back up / let go &nbsp;<b>&larr; &rarr;</b> turn</div><div><b>Space</b> pounce &nbsp;<b>R</b> call</div><div style="opacity:.8;margin-top:4px">Pounce on prey to cling on and keep biting.<br>The big carnivores will still hunt you.</div>',
+      touch: 'Drag the pad to move (a gentle push sneaks). Pounce on prey to cling on; pull back to let go.' },
   };
   const player = { kind: 'quetz', dino: null, models: {} };
   const controlsEl = document.getElementById('controls'), touchHintEl = document.getElementById('touchhint'), titleEl = document.getElementById('title'), altLine = document.getElementById('altline');
@@ -2668,21 +2852,25 @@
       if (!d) {
         HQ = true; const spec = cfg.build(); HQ = false;
         d = Object.assign({ x: 0, z: 0, yaw: 0, speedNow: 0, phase: 0, walkT: 0, drinkT: 0, drinking: false, roarTimer: 1e9, roarT: 0, lungeT: 0, lungeCd: 0, lungeK: 0, lungeJaw: 0, aim: 0.35, snapped: false, seed: rand(0, 100), hunt: 0 }, spec);
-        d.hop = cfg.hop; d.rear = cfg.rear;
+        d.hop = cfg.hop; d.rear = cfg.rear; d.base = cfg.name; d.baseStride = d.stride;
+        measureBody(d); d.box1 = d.box;
         scene.add(d.group);
         player.models[kind] = d;
       }
       const s = landNearPlayer();
-      d.x = s.x; d.z = s.z; d.yaw = P.yaw; d.speedNow = 0; d.group.visible = true;
+      d.x = s.x; d.z = s.z; d.yaw = P.yaw; d.speedNow = 0; d.group.visible = true; d.group.rotation.z = 0; d.yOff = 0; d.groundY = null;
       player.dino = d;
       P.x = d.x; P.z = d.z; P.y = terrainH(d.x, d.z) + 2;
       camInit = false;
     }
     player.kind = kind;
+    applyGrowth();
     titleEl.textContent = cfg.name;
     controlsEl.innerHTML = cfg.controls;
     touchHintEl.textContent = cfg.touch;
     takeoffBtn.textContent = cfg.action;
+    roarBtn.textContent = cfg.roar || ''; roarBtn.classList.toggle('show', !!cfg.roar);
+    life.latched = null; life.eating = null;
     altLine.style.display = kind === 'quetz' ? '' : 'none';
     for (const c of selectEl.querySelectorAll('.card')) c.classList.toggle('active', c.dataset.kind === kind);
     for (const d of dinos) if (d.hunt > 0 && !huntsPlayer(d)) d.hunt = 0;
@@ -2692,60 +2880,120 @@
   document.getElementById('switch').addEventListener('click', () => showSelect(!selectEl.classList.contains('show')));
   window.addEventListener('keydown', e => {
     if (e.code === 'Escape') showSelect(!selectEl.classList.contains('show'));
+    if (e.code === 'KeyC' && !e.repeat) toggleChal();
+    if (e.code === 'KeyM' && !e.repeat) toggleMute();
     if (e.code === 'Digit1') { selectCharacter('quetz'); showSelect(false); }
     if (e.code === 'Digit2') { selectCharacter('trex'); showSelect(false); }
     if (e.code === 'Digit3') { selectCharacter('spino'); showSelect(false); }
     if (e.code === 'Digit4') { selectCharacter('raptor'); showSelect(false); }
   });
 
-  // T. rex roar: nearby plant-eaters bolt
+  // A roar: nearby plant-eaters bolt, unless they are the kind that stands and fights
   function scareHerds(radius) {
+    let n = 0;
     for (const d of dinos) {
-      if (d.carnivore || d.role === 'swim') continue;
-      if (Math.hypot(d.x - P.x, d.z - P.z) < radius) { d.flee = rand(4, 7); d.state = 'walk'; d.minH = Math.min(d.minH, WATER_Y + 0.6); }   // drinkers stand on the low shore, so let them run across it
+      if (d.carnivore || d.role === 'swim' || d.dead) continue;
+      if (Math.hypot(d.x - P.x, d.z - P.z) < radius) { d.aware = 1; d.lookX = P.x; d.lookZ = P.z; if (react(d, PF, false)) n++; }
     }
+    stampede(n, P.x, P.z);
+    addShow(25, P.x, P.z);
   }
 
   function updateGroundPlayer(dt, t) {
-    const d = player.dino, cfg = CHAR[player.kind];
+    const d = player.dino, cfg = CHAR[player.kind], g = growthOf(player.kind);
     let turn = (keys.ArrowLeft || keys.KeyA ? 1 : 0) - (keys.ArrowRight || keys.KeyD ? 1 : 0);
     let move = (keys.ArrowUp || keys.KeyW ? 1 : 0) - (keys.ArrowDown || keys.KeyS ? 1 : 0);
     if (touch.active) { turn = deadzone(-touch.x); move = deadzone(-touch.y); }
-    const actionReq = P.takeoffReq; P.takeoffReq = false;
+    if ((keys.ShiftLeft || keys.ShiftRight) && move > 0) move *= 0.3;   // sneak
+    let actionReq = P.takeoffReq, roarReq = P.roarReq; P.takeoffReq = false; P.roarReq = false;
+    if (life.dead) { turn = 0; move = 0; actionReq = roarReq = false; }
+    const run = runSpeed();
 
-    // turning is slower at full sprint, like a real animal leaning into a wide arc; the turn eases in and out
-    // rather than snapping with the key press
-    const speedFrac = Math.min(1, Math.abs(d.speedNow) / cfg.run);
-    d.turnV = damp(d.turnV || 0, turn, 7, dt);
-    d.yaw += d.turnV * cfg.turn * (1 - 0.45 * speedFrac) * dt;
-    d.lean = -d.turnV * speedFrac;
-    const want = move > 0.15 ? cfg.run * move : move < -0.15 ? cfg.back * move : 0;
-    d.speedNow = damp(d.speedNow, want, want === 0 ? 4 : 2.2, dt);
+    const L = life.latched;
+    if (L && (L.dead || move < -0.5 || (life.latchT -= dt) <= 0)) { life.latched = null; d.speedNow = -2; }
+    if (life.latched) {
+      // clinging to the prey's flank, biting again and again while it tries to run
+      const c = Math.cos(L.yaw), s = Math.sin(L.yaw), lz = L.box.z1 * 0.3, lx = (L.box.x + 0.2) * life.latchSide;
+      d.x = L.x + lx * c + lz * s; d.z = L.z - lx * s + lz * c;
+      d.yaw = angleLerp(d.yaw, L.yaw - life.latchSide * 1.3, 1 - Math.exp(-8 * dt));
+      d.yOff = damp(d.yOff || 0, L.box.y * 0.35, 8, dt); d.speedNow = 0; d.lean = 0;
+      L.flee = Math.max(L.flee, 1.5); L.speedNow *= Math.pow(0.6, dt);
+      if ((life.latchBite -= dt) <= 0) { life.latchBite = 0.55; const m = mouthOf(d); Sound.bite({ x: m.x, y: d.groundY + 1, z: m.z }, false); damageDino(L, 45 * Math.sqrt(playerMass()), 'player'); }
+      life.exert = 0.6;
+    } else {
+      d.yOff = damp(d.yOff || 0, life.dead ? d.box.x * 0.8 : 0, 8, dt);
+      // turning is slower at full sprint, like a real animal leaning into a wide arc; the young are nimbler
+      const speedFrac = Math.min(1, Math.abs(d.speedNow) / run);
+      d.turnV = damp(d.turnV || 0, turn, 7, dt);
+      d.yaw += d.turnV * cfg.turn * (1 + 0.6 * (1 - g)) * (1 - 0.45 * speedFrac) * dt;
+      d.lean = -d.turnV * speedFrac;
+      const want = move > 0.15 ? run * move : move < -0.15 ? cfg.back * move : 0;
+      d.speedNow = damp(d.speedNow, want, want === 0 ? 4 : 2.2, dt);
+      if (life.pounceT > 0) { life.pounceT -= dt; d.speedNow = Math.max(d.speedNow, run * 1.15); }
+      life.exert = d.speedNow > run * 0.7 ? 1 : 0;
+      life.knock.x = damp(life.knock.x, 0, 3, dt); life.knock.z = damp(life.knock.z, 0, 3, dt);
+      forward.set(Math.sin(d.yaw), 0, Math.cos(d.yaw));
+      let nx = clamp(d.x + (forward.x * d.speedNow + life.knock.x) * dt, -HALF + 30, HALF - 30), nz = clamp(d.z + (forward.z * d.speedNow + life.knock.z) * dt, -HALF + 30, HALF - 30);
+      const pad = cfg.pad * g, vp = nearViewpoint(nx, nz, pad);
+      if (vp) { const a = Math.atan2(nx - vp.x, nz - vp.z); nx = vp.x + Math.sin(a) * (vp.r + pad); nz = vp.z + Math.cos(a) * (vp.r + pad); }
+      const nh = terrainH(nx, nz);
+      if (nh > cfg.minH * g && nh < 60) { d.x = nx; d.z = nz; } else d.speedNow = 0;
+    }
     forward.set(Math.sin(d.yaw), 0, Math.cos(d.yaw));
-    let nx = clamp(d.x + forward.x * d.speedNow * dt, -HALF + 30, HALF - 30), nz = clamp(d.z + forward.z * d.speedNow * dt, -HALF + 30, HALF - 30);
-    const vp = nearViewpoint(nx, nz, cfg.pad);
-    if (vp) { const a = Math.atan2(nx - vp.x, nz - vp.z); nx = vp.x + Math.sin(a) * (vp.r + cfg.pad); nz = vp.z + Math.cos(a) * (vp.r + cfg.pad); }
-    const nh = terrainH(nx, nz);
-    if (nh > cfg.minH && nh < 60) { d.x = nx; d.z = nz; } else d.speedNow = 0;
+    if (life.dead) d.group.rotation.z = damp(d.group.rotation.z, 1.35, 3, dt);
 
     d.lungeCd = Math.max(0, d.lungeCd - dt);
-    if (actionReq && d.lungeT <= 0 && d.lungeCd <= 0) {
-      d.lungeT = 1.0; d.lungeCd = 0.9; d.snapped = false;
-      if (cfg.scare) { d.roarT = 1.6; scareHerds(cfg.scare); cheerViewpoints(); shake = 0.5; }
+    if (actionReq && !life.latched && d.lungeT <= 0 && d.lungeCd <= 0) {
+      if (life.stamina < 4) note('Too tired');
+      else {
+        d.lungeT = 1.0; d.lungeCd = player.kind === 'raptor' ? 0.7 : 0.9; d.snapped = false;
+        life.stamina -= player.kind === 'raptor' ? 12 : 6;
+        if (player.kind === 'raptor') life.pounceT = 0.45;
+      }
     }
-    tickLunge(d, dt);
+    if (roarReq && d.roarT <= 0 && !life.latched) {
+      if (life.stamina < 20) note('Too tired to roar');
+      else { life.stamina -= 20; d.roarT = 1.6; scareHerds(cfg.scare * (0.4 + 0.6 * g)); cheerViewpoints(); shake = Math.max(shake, 0.5 * g); }
+    }
+    // a pouncing raptor bites the moment it reaches something, rather than overshooting it
+    if (life.pounceT > 0 && d.lungeT > 0 && !d.snapped) {
+      const pm = mouthOf(d), pr = reachOf(d);
+      if (dinos.some(o => !o.dead && o.role !== 'swim' && Math.abs(o.x - pm.x) < 12 && Math.abs(o.z - pm.z) < 12 && bodyDist(o, pm.x, pm.z) < pr)) { d.snapped = true; life.pounceT = 0; playerBite(); }
+    }
+    tickLunge(d, dt, playerBite);
+    if (life.latched) d.lungeJaw = 0.45 + 0.45 * Math.sin(t * 9);
     d.aim = 0.35;
+
+    // standing still: eat from a carcass at the mouth, or drink with the snout over the water
+    const idle = !life.dead && !life.latched && Math.abs(move) < 0.15 && Math.abs(d.speedNow) < 0.8;
+    life.idleT = idle ? life.idleT + dt : 0;
+    const m = mouthOf(d), reach = reachOf(d) + 1.0, mx = m.x, mz = m.z;
+    let meat = null, meatNear = null;
+    for (const o of dinos) {
+      if (!o.dead || o.gone || o.meat <= 0 || Math.abs(o.x - d.x) > 45 || Math.abs(o.z - d.z) > 45) continue;
+      const bd = bodyDist(o, mx, mz);
+      if (bd < reach) { meat = o; break; } else if (bd < 12) meatNear = o;
+    }
+    const eat = idle && meat && life.hunger < 99.5 ? meat : null;
+    const drink = !eat && idle && life.idleT > 0.5 && terrainH(mx, mz) < WATER_Y + 0.15 && terrainH(d.x, d.z) > WATER_Y - 1.5;
+    d.drinking = !!eat || drink; d.chomp = !!eat;
+    life.eating = eat && d.drinkT > 0.75 ? eat : null;
+    life.drinking = drink && d.drinkT > 0.75;
+    if (life.eating) eatFrom(life.eating, dt, { x: mx, z: mz });
+    if (life.drinking) { const li = nearestLake(mx, mz); if (!chal.drank.includes(li)) { chal.drank.push(li); chal.saveT = 1; challenge('drink', 1); } }
     animateDino(d, dt, t, true);
 
     const gh = d.groundY;   // smoothed by animateDino, so the camera doesn't jolt over every bump either
     P.x = d.x; P.z = d.z; P.y = gh + 2; P.yaw = d.yaw; P.speed = Math.abs(d.speedNow);
     takeoffBtn.classList.add('show');
-    modeHint.classList.remove('show');
+    const hint = life.dead ? '' : life.eating ? 'Eating the ' + life.eating.name + '…' : life.drinking ? 'Drinking…' : life.latched ? 'Clinging on! Pull back to let go'
+      : meat ? (life.hunger >= 99.5 ? 'You are full' : 'Stand still to eat') : meatNear && life.hunger < 99.5 ? 'Walk up to the ' + meatNear.name + ' to eat' : '';
+    modeHint.textContent = hint; modeHint.classList.toggle('show', !!hint);
 
-    const back = cfg.camBack, height = cfg.camH;
+    const sc = 0.4 + 0.6 * g, back = cfg.camBack * sc, height = cfg.camH * sc;
     camTarget.set(d.x - forward.x * back, gh + height, d.z - forward.z * back);
-    camTarget.y = Math.max(camTarget.y, terrainH(camTarget.x, camTarget.z) + 1.6);   // never sink into a hillside behind the animal
-    camLook.set(d.x + forward.x * 6, gh + cfg.lookH, d.z + forward.z * 6);
+    camTarget.y = Math.max(camTarget.y, terrainH(camTarget.x, camTarget.z) + 1.6 * sc);   // never sink into a hillside behind the animal
+    camLook.set(d.x + forward.x * 6 * sc, gh + cfg.lookH * g + (d.yOff || 0), d.z + forward.z * 6 * sc);
     if (!camInit) { camera.position.copy(camTarget); camLookCur.copy(camLook); camInit = true; }
     camera.position.lerp(camTarget, 1 - Math.exp(-4.5 * dt));
     camLookCur.lerp(camLook, 1 - Math.exp(-6 * dt));
@@ -2755,31 +3003,1025 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Sound: everything is synthesised with Web Audio, so there are no files to load.
+  // Calls are ignored until the first key press or tap unlocks audio.
+  // ---------------------------------------------------------------------------
+  const Sound = (function () {
+    let ctx = null, master = null, noiseBuf = null, muted = store.get('muted', false), birdT = 2, beatT = 0;
+    const S = { ready: false }, amb = {}, _f = new THREE.Vector3();
+    const live = () => S.ready && ctx.state === 'running';   // nothing is scheduled while the context is suspended
+    const VOICES = {
+      roar: { type: 'sawtooth', f: 58, sweep: [0.8, 1.3, 0.72], dur: 1.6, noise: 0.5, nf: 600, form: [[300, 3, 1], [720, 4, 0.55], [1500, 5, 0.22]], am: 24, amD: 0.4, lp: 2400, vol: 1 },
+      screech: { type: 'sawtooth', f: 620, sweep: [0.85, 1.35, 0.75], dur: 0.75, noise: 0.35, nf: 2600, form: [[1200, 3, 1], [2600, 4, 0.6]], am: 34, amD: 0.3, lp: 6000, vol: 0.5, vib: [9, 0.04] },
+      hiss: { type: null, dur: 1.0, noise: 1, nf: 3200, nq: 1.2, form: [], am: 38, amD: 0.5, lp: 8000, vol: 0.45 },
+      rumble: { type: 'sine', f: 34, sweep: [0.95, 1.12, 0.85], dur: 2.3, noise: 0.35, nf: 180, form: [[90, 2, 1]], am: 7, amD: 0.2, lp: 400, vol: 1.3 },
+      bellow: { type: 'sawtooth', f: 82, sweep: [0.9, 1.12, 0.8], dur: 0.95, noise: 0.25, nf: 500, form: [[340, 3, 1], [820, 4, 0.4]], am: 13, amD: 0.25, lp: 1600, vol: 0.75 },
+      honk: { type: 'sawtooth', f: 96, sweep: [0.97, 1.05, 0.96], dur: 1.6, noise: 0.05, nf: 400, form: [[192, 9, 1], [384, 9, 0.6], [768, 9, 0.25]], am: 0, lp: 1400, vol: 0.8, vib: [5, 0.012] },
+      chirp: { type: 'sine', f: 760, sweep: [0.9, 1.55, 1.0], dur: 0.28, noise: 0, form: [], am: 0, lp: 6000, vol: 0.3, rep: 2 },
+      squawk: { type: 'sawtooth', f: 330, sweep: [1, 1.25, 0.7], dur: 0.55, noise: 0.3, nf: 1500, form: [[900, 3, 1], [1800, 4, 0.4]], am: 0, lp: 4000, vol: 0.5 },
+    };
+    S.init = function () {
+      if (ctx) { if (ctx.state === 'suspended') ctx.resume().catch(() => {}); return; }
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      try { ctx = new AC(); } catch (e) { ctx = null; return; }
+      master = ctx.createGain(); master.gain.value = muted ? 0 : 0.9;
+      const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -18; comp.ratio.value = 4;
+      master.connect(comp); comp.connect(ctx.destination);
+      const len = ctx.sampleRate * 2; noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate);
+      const ch = noiseBuf.getChannelData(0); for (let i = 0; i < len; i++) ch[i] = Math.random() * 2 - 1;
+      startAmbience(); S.ready = true;
+    };
+    S.toggle = function () { muted = !muted; store.set('muted', muted); if (master) master.gain.setTargetAtTime(muted ? 0 : 0.9, ctx.currentTime, 0.05); return muted; };
+    S.muted = () => muted;
+    // building blocks
+    const now = () => ctx.currentTime;
+    function noise(t0, dur) { const s = ctx.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.start(t0, Math.random() * 1.5); if (dur) s.stop(t0 + dur + 0.05); return s; }
+    function osc(type, f, t0, dur) { const o = ctx.createOscillator(); o.type = type; o.frequency.setValueAtTime(f, t0); o.start(t0); if (dur) o.stop(t0 + dur + 0.05); return o; }
+    function filt(type, f, q) { const b = ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q != null) b.Q.value = q; return b; }
+    function gain(v) { const g = ctx.createGain(); g.gain.value = v == null ? 1 : v; return g; }
+    function env(g, t0, a, peak, hold, rel) { const p = g.gain; p.setValueAtTime(0.0001, t0); p.linearRampToValueAtTime(peak, t0 + a); p.setValueAtTime(peak, t0 + a + hold); p.exponentialRampToValueAtTime(0.0001, t0 + a + hold + rel); }
+    function setP(p, x, y, z) { if (p.positionX) { p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; } else p.setPosition(x, y, z); }
+    function panAt(pos, ref) { const p = ctx.createPanner(); p.panningModel = 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = ref || 8; p.rolloffFactor = 1; setP(p, pos.x, pos.y, pos.z); p.connect(master); return p; }
+    const far = (pos, maxD) => Math.hypot(pos.x - camera.position.x, pos.y - camera.position.y, pos.z - camera.position.z) > maxD;
+    function burstNoise(out, t0, type, f, q, peak, a, hold, rel) { const n = noise(t0, a + hold + rel), b = filt(type, f, q), g = gain(0); n.connect(b); b.connect(g); g.connect(out); env(g, t0, a, peak, hold, rel); return b; }
+    function tone(out, t0, type, f0, f1, peak, a, hold, rel) { const o = osc(type, f0, t0, a + hold + rel), g = gain(0); if (f1) o.frequency.exponentialRampToValueAtTime(f1, t0 + a + hold + rel); o.connect(g); g.connect(out); env(g, t0, a, peak, hold, rel); return o; }
+
+    // animal voices: an oscillator (the larynx) shaped by formant filters, a breathy noise layer and a growl tremolo
+    function voiceOnce(v, out, t0, dur, pitch, vol) {
+      const g = gain(0); g.connect(out);
+      const lp = filt('lowpass', v.lp * Math.min(2, pitch)); lp.connect(g);
+      const mix = gain(1);
+      if (v.am) {
+        const amg = gain(1 - v.amD), l = osc('sine', v.am * rand(0.9, 1.1), t0, dur + 0.3), lg = gain(v.amD);
+        l.connect(lg); lg.connect(amg.gain); mix.connect(amg); amg.connect(lp);
+      } else mix.connect(lp);
+      if (v.type) {
+        const f = v.f * pitch * rand(0.94, 1.06);
+        for (const det of v.vol > 0.7 ? [1, 1.012] : [1]) {
+          const o = osc(v.type, f * v.sweep[0] * det, t0, dur + 0.3);
+          o.frequency.linearRampToValueAtTime(f * v.sweep[1] * det, t0 + dur * 0.25);
+          o.frequency.exponentialRampToValueAtTime(f * v.sweep[2] * det, t0 + dur);
+          if (v.vib) { const vb = osc('sine', v.vib[0], t0, dur + 0.3), vg = gain(f * v.vib[1]); vb.connect(vg); vg.connect(o.frequency); }
+          const og = gain(0.5); o.connect(og);
+          if (v.form.length) for (const [ff, q, a] of v.form) { const b = filt('bandpass', ff * Math.sqrt(pitch), q), bg = gain(a * 2.2); og.connect(b); b.connect(bg); bg.connect(mix); }
+          else og.connect(mix);
+        }
+      }
+      if (v.noise) { const n = noise(t0, dur + 0.3), b = filt('bandpass', v.nf * pitch, v.nq || 0.8), ng = gain(v.noise); n.connect(b); b.connect(ng); ng.connect(mix); }
+      env(g, t0, Math.min(0.12, dur * 0.15), 0.5 * vol * v.vol, dur * 0.45, dur * 0.5);
+    }
+    // pitch > 1 for smaller animals; vol scales loudness and how far away it carries
+    S.voice = function (kind, pos, pitch, vol) {
+      const v = VOICES[kind]; if (!live() || !v) return;
+      pitch = pitch || 1; vol = vol || 1;
+      if (far(pos, 70 + 260 * vol * v.vol)) return;
+      const out = panAt(pos, 6 + 14 * vol * v.vol), dur = v.dur / Math.sqrt(Math.max(pitch, 0.5)), t0 = now() + 0.01;
+      for (let r = 0; r < (v.rep || 1); r++) voiceOnce(v, out, t0 + r * dur * 1.3, dur, pitch, vol);
+    };
+    // a footfall: a thud for the heavy animals (lower and longer the bigger they are), a scuff for the light ones
+    S.step = function (pos, mass) {
+      if (!live() || far(pos, 22 + 20 * Math.sqrt(Math.min(mass, 40)))) return;
+      const out = panAt(pos, 2 + 2.5 * Math.sqrt(mass)), t0 = now() + 0.005;
+      if (mass > 0.25) {
+        const f = 72 / Math.pow(mass, 0.18), m = Math.min(1.3, Math.pow(mass, 0.3));
+        tone(out, t0, 'sine', f * 1.6, f * 0.6, 0.6 * m, 0.006, 0.02, 0.26 + 0.03 * Math.sqrt(mass));
+        burstNoise(out, t0, 'lowpass', 240 + 200 / Math.sqrt(mass), 0.7, 0.3 * m, 0.004, 0.01, 0.16);
+      } else burstNoise(out, t0, 'bandpass', 1700, 0.9, 0.1 + mass * 0.5, 0.003, 0.01, 0.07);
+    };
+    S.bite = function (pos, big) {
+      if (!live() || far(pos, 140)) return;
+      const out = panAt(pos, big ? 10 : 4), t0 = now() + 0.005;
+      burstNoise(out, t0, 'bandpass', 1400, 1.1, 0.7, 0.002, 0.03, 0.14);
+      tone(out, t0, 'square', 170, 90, 0.25, 0.002, 0.0, 0.06);
+      if (big) tone(out, t0, 'sine', 90, 40, 0.5, 0.004, 0.02, 0.2);
+    };
+    S.snap = function (pos) { if (!live() || far(pos, 90)) return; const out = panAt(pos, 5), t0 = now() + 0.005; tone(out, t0, 'square', 200, 110, 0.22, 0.002, 0, 0.05); burstNoise(out, t0, 'highpass', 2500, 0.7, 0.15, 0.002, 0, 0.04); };
+    S.thud = function (pos) { if (!live() || far(pos, 160)) return; const out = panAt(pos, 10), t0 = now() + 0.005; tone(out, t0, 'sine', 120, 45, 0.8, 0.004, 0.03, 0.3); burstNoise(out, t0, 'lowpass', 600, 0.7, 0.4, 0.003, 0.02, 0.2); };
+    S.splash = function (pos, size) {
+      if (!live() || far(pos, 120)) return;
+      const out = panAt(pos, 3 + size * 5), t0 = now() + 0.005;
+      const b = burstNoise(out, t0, 'lowpass', 2600, 0.7, 0.35 + size * 0.3, 0.01, 0.05, 0.35 + size * 0.25);
+      b.frequency.exponentialRampToValueAtTime(320, t0 + 0.5 + size * 0.2);
+    };
+    S.squeak = function (pos) { if (!live() || far(pos, 40)) return; const out = panAt(pos, 2), t0 = now() + 0.005; tone(out, t0, 'sine', 2600, 3400, 0.12, 0.005, 0.03, 0.05); tone(out, t0 + 0.11, 'sine', 2900, 3700, 0.1, 0.005, 0.02, 0.05); };
+    S.chew = function (pos) { if (!live() || far(pos, 50)) return; const out = panAt(pos, 3), t0 = now() + 0.005; burstNoise(out, t0, 'lowpass', 700, 1.5, 0.3, 0.01, 0.04, 0.1); burstNoise(out, t0 + 0.05, 'bandpass', 1900, 2, 0.12, 0.005, 0.01, 0.05); };
+    S.scream = function (pos, n) {
+      if (!live() || far(pos, 200)) return;
+      const out = panAt(pos, 14), t0 = now() + 0.01;
+      for (let i = 0; i < (n || 3); i++) {
+        const st = t0 + rand(0, 0.5), f = rand(850, 1300), o = tone(out, st, i % 2 ? 'triangle' : 'sine', f, f * 0.75, 0.13, 0.08, 0.35, 0.4);
+        o.frequency.setValueAtTime(f, st); o.frequency.linearRampToValueAtTime(f * 1.25, st + 0.25); o.frequency.exponentialRampToValueAtTime(f * 0.7, st + 0.85);
+        const vb = osc('sine', rand(6, 9), st, 0.9), vg = gain(f * 0.03); vb.connect(vg); vg.connect(o.frequency);
+      }
+    };
+    S.cheer = function (pos) {
+      if (!live() || far(pos, 220)) return;
+      const out = panAt(pos, 16), t0 = now() + 0.01;
+      burstNoise(out, t0, 'bandpass', 1100, 0.7, 0.25, 0.2, 0.6, 0.9);
+      for (let i = 0; i < 6; i++) { const st = t0 + rand(0, 0.6), f = rand(280, 520); tone(out, st, 'sawtooth', f, f * 1.35, 0.03, 0.08, 0.3, 0.35); }
+    };
+    S.shutter = function (pos) { if (!live() || far(pos, 60)) return; const out = panAt(pos, 3), t0 = now() + 0.005; burstNoise(out, t0, 'highpass', 3500, 0.7, 0.12, 0.001, 0, 0.02); burstNoise(out, t0 + 0.07, 'highpass', 3000, 0.7, 0.1, 0.001, 0, 0.03); };
+    S.chime = function () { if (!live()) return; const t0 = now() + 0.01; [660, 880, 1320].forEach((f, i) => tone(master, t0 + i * 0.11, 'sine', f, 0, 0.16, 0.01, 0.05, 0.6)); };
+    S.hurt = function () { if (!live()) return; const t0 = now() + 0.005; tone(master, t0, 'sine', 140, 50, 0.5, 0.004, 0.03, 0.25); burstNoise(master, t0, 'bandpass', 900, 0.8, 0.35, 0.003, 0.03, 0.15); };
+    S.dart = function () { if (!live()) return; const t0 = now() + 0.005; burstNoise(master, t0, 'bandpass', 1200, 1.5, 0.3, 0.005, 0.02, 0.08); tone(master, t0 + 0.08, 'sine', 1600, 900, 0.08, 0.005, 0.02, 0.1); };
+    S.flap = function (vol) { if (!live()) return; burstNoise(master, now() + 0.005, 'bandpass', 330, 0.6, 0.12 * vol, 0.08, 0.05, 0.25); };
+    S.gulp = function () { if (!live()) return; const t0 = now() + 0.005; tone(master, t0, 'sine', 300, 140, 0.18, 0.01, 0.04, 0.1); };
+    function chirpSeq(pos) {
+      const out = panAt(pos, 8), t0 = now() + 0.01, n = 3 + Math.floor(Math.random() * 4), base = rand(2400, 4200);
+      for (let i = 0; i < n; i++) tone(out, t0 + i * rand(0.09, 0.15), 'sine', base * rand(0.85, 1.1), base * rand(1.1, 1.5), 0.05, 0.005, 0.02, 0.06);
+    }
+    function loopNoise(type, f, q) { const n = noise(now()), b = filt(type, f, q), g = gain(0); n.connect(b); b.connect(g); return { n, b, g }; }
+    function startAmbience() {
+      amb.wind = loopNoise('bandpass', 600, 0.6); amb.wind.g.connect(master);
+      amb.water = loopNoise('lowpass', 520, 0.7); amb.water.g.connect(master);
+      amb.insects = loopNoise('bandpass', 5200, 9);
+      const am = gain(0.5), lfo = osc('sine', 27, now()), lg = gain(0.5); lfo.connect(lg); lg.connect(am.gain);
+      amb.insects.g.disconnect(); amb.insects.b.disconnect(); amb.insects.b.connect(am); am.connect(amb.insects.g); amb.insects.g.connect(master);
+      amb.crowd = VIEWPOINTS.map(v => { const c = loopNoise('bandpass', 850, 0.7); c.g.connect(panAt({ x: v.x, y: v.F + 1.5, z: v.z }, 10)); return c; });
+      amb.engines = jeeps.map(j => {
+        const o = osc('sawtooth', 40, now()), b = filt('lowpass', 320, 1), g = gain(0), p = panAt({ x: j.x, y: 1, z: j.z }, 6);
+        o.connect(b); b.connect(g); g.connect(p);
+        let siren = null;
+        if (j.ranger) { const so = osc('square', 700, now()), sb = filt('bandpass', 950, 1.5), sg = gain(0); so.connect(sb); sb.connect(sg); sg.connect(p); siren = { o: so, g: sg }; }
+        return { o, g, p, j, siren };
+      });
+    }
+    S.update = function (dt) {
+      if (!live()) return;
+      const t = now(), cp = camera.position, L = ctx.listener;
+      camera.getWorldDirection(_f);
+      if (L.positionX) { L.positionX.value = cp.x; L.positionY.value = cp.y; L.positionZ.value = cp.z; L.forwardX.value = _f.x; L.forwardY.value = _f.y; L.forwardZ.value = _f.z; L.upX.value = 0; L.upY.value = 1; L.upZ.value = 0; }
+      else { L.setPosition(cp.x, cp.y, cp.z); L.setOrientation(_f.x, _f.y, _f.z, 0, 1, 0); }
+      const alt = P.y - Math.max(terrainH(P.x, P.z), WATER_Y), flying = player.kind === 'quetz' && P.mode !== 'ground';
+      const set = (prm, v, tc) => prm.setTargetAtTime(v, t, tc || 0.3);
+      set(amb.wind.g.gain, flying ? 0.05 + P.speed * 0.004 + Math.min(alt, 200) * 0.0004 : 0.025);
+      set(amb.wind.b.frequency, 380 + (flying ? P.speed * 22 : 120));
+      set(amb.water.g.gain, 0.14 * clamp(1 - nearestLakeDist(cp.x, cp.z) / 70, 0, 1));
+      set(amb.insects.g.gain, 0.012 * clamp(1 - alt / 30, 0, 1));
+      VIEWPOINTS.forEach((v, i) => {
+        const c = amb.crowd[i];
+        set(c.g.gain, (v.panicking ? 0.22 : 0.05 + 0.04 * (v.near ? 1 : 0)) * Math.min(1, v.people.length / 8));
+        set(c.b.frequency, v.panicking ? 1400 : 850);
+      });
+      for (const e of amb.engines) {
+        const j = e.j; setP(e.p, j.x, terrainH(j.x, j.z) + 1, j.z);
+        set(e.o.frequency, 34 + j.speed * 5, 0.2); set(e.g.gain, 0.05 + 0.04 * Math.min(1, j.speed / 10), 0.2);
+        if (e.siren) { set(e.siren.g.gain, j.siren ? 0.07 : 0, 0.1); e.siren.o.frequency.setValueAtTime(Math.floor(t * 1.6) % 2 ? 640 : 880, t); }
+      }
+      if ((birdT -= dt) <= 0) {
+        birdT = rand(1.2, 5);
+        if (alt < 80) { const a = rand(0, TAU), r = rand(25, 80); chirpSeq({ x: cp.x + Math.cos(a) * r, y: cp.y + rand(2, 12), z: cp.z + Math.sin(a) * r }); }
+      }
+      if (life.health < 30 && !life.dead && (beatT -= dt) <= 0) { beatT = 0.85; tone(master, t + 0.01, 'sine', 60, 40, 0.5, 0.01, 0.02, 0.12); tone(master, t + 0.24, 'sine', 55, 38, 0.35, 0.01, 0.02, 0.12); }
+    };
+    return S;
+  })();
+  for (const ev of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(ev, () => Sound.init(), { passive: true });
+
+  // ---------------------------------------------------------------------------
+  // Effects: droplets, blood and dust as point sprites, and rings on the water
+  // ---------------------------------------------------------------------------
+  const dotTex = makeTex(64, (ctx, s) => {
+    const gr = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+    gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,.75)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.fillRect(0, 0, s, s);
+  }, { clamp: true });
+  function makeFx(n, size, opacity) {
+    const geo = new THREE.BufferGeometry(), pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) pos[i * 3 + 1] = -1e4;
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ size, map: dotTex, vertexColors: true, transparent: true, opacity, depthWrite: false }));
+    pts.frustumCulled = false; scene.add(pts);
+    return { pts, pos, col, n, list: [], next: 0 };
+  }
+  const sparks = makeFx(LOW ? 160 : 320, 0.3, 0.95), dustFx = makeFx(LOW ? 60 : 140, 2.4, 0.32);
+  function emit(sys, x, y, z, n, color, spd, up, lifeT, grav) {
+    _c.set(color);
+    for (let i = 0; i < n; i++) {
+      const k = sys.next; sys.next = (sys.next + 1) % sys.n;
+      const a = rand(0, TAU), s = spd * rand(0.3, 1);
+      sys.list[k] = { x, y, z, vx: Math.cos(a) * s, vy: up * rand(0.5, 1.2), vz: Math.sin(a) * s, t: 0, life: lifeT * rand(0.6, 1.2), g: grav };
+      sys.col[k * 3] = _c.r; sys.col[k * 3 + 1] = _c.g; sys.col[k * 3 + 2] = _c.b;
+    }
+    sys.pts.geometry.attributes.color.needsUpdate = true;
+  }
+  function stepFx(sys, dt) {
+    const p = sys.pos;
+    for (let k = 0; k < sys.n; k++) {
+      const e = sys.list[k]; if (!e) continue;
+      e.t += dt;
+      if (e.t > e.life) { sys.list[k] = null; p[k * 3 + 1] = -1e4; continue; }
+      e.vy -= e.g * dt; e.x += e.vx * dt; e.y += e.vy * dt; e.z += e.vz * dt;
+      p[k * 3] = e.x; p[k * 3 + 1] = e.y; p[k * 3 + 2] = e.z;
+    }
+    sys.pts.geometry.attributes.position.needsUpdate = true;
+  }
+  const ripples = [], rippleGeo = new THREE.RingGeometry(0.85, 1, 40); rippleGeo.rotateX(-Math.PI / 2);
+  for (let i = 0; i < 10; i++) { const m = new THREE.Mesh(rippleGeo, new THREE.MeshBasicMaterial({ color: 0xe8f4f8, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; scene.add(m); ripples.push({ m, t: 1, size: 1 }); }
+  let rippleNext = 0;
+  function splash(x, z, size) {
+    const r = ripples[rippleNext]; rippleNext = (rippleNext + 1) % ripples.length;
+    r.t = 0; r.size = size; r.m.position.set(x, WATER_Y + 0.06, z); r.m.visible = true;
+    emit(sparks, x, WATER_Y + 0.1, z, Math.round(8 + size * 10), 0xdcecf2, 1.5 + size, 3 + size * 2, 0.9, 9.8);
+    Sound.splash({ x, y: 0, z }, size);
+  }
+  function stepRipples(dt) {
+    for (const r of ripples) {
+      if (!r.m.visible) continue;
+      r.t += dt / (1.2 + r.size * 0.5);
+      if (r.t >= 1) { r.m.visible = false; continue; }
+      const s = r.size * (0.4 + 3 * r.t); r.m.scale.set(s, 1, s); r.m.material.opacity = 0.55 * (1 - r.t);
+    }
+  }
+  const blood = (x, y, z, n) => emit(sparks, x, y, z, n, 0x6e0d0a, 2.2, 2.5, 0.7, 9.8);
+  const dustAt = (x, y, z, s) => emit(dustFx, x + rand(-s, s), y + 0.5, z + rand(-s, s), 1, 0xb9a27c, 0.5 * s, 0.7, 1.7, -0.15);
+
+  // ---------------------------------------------------------------------------
+  // Small prey: lizards and early mammals scurrying through the grass, and fish in the lakes
+  // ---------------------------------------------------------------------------
+  const critters = [];
+  {
+    const N = LOW ? 24 : 48;
+    for (let i = 0; i < N; i++) {
+      const s = landSpot(1.5, 22, 520, 60); if (!s) continue;
+      const lizard = Math.random() < 0.5, k = rand(0.85, 1.3);
+      const c = lizard ? pick([0x5a6b3a, 0x7a6a3a, 0x4d5c3c, 0x8a7448]) : pick([0x6b4a2e, 0x5a4636, 0x8a6a48, 0x4a3a2c]);
+      const parts = lizard
+        ? [[place(ell(0.08, 0.05, 0.2, 8), 0, 0.07, 0), c], [place(ell(0.055, 0.04, 0.075, 8), 0, 0.08, 0.24), c], [place(coneZ(0.045, 0.42, 6), 0, 0.06, -0.12, 0, Math.PI, 0), c],
+          [place(ell(0.012, 0.012, 0.01, 5), 0.04, 0.1, 0.27), 0x111111], [place(ell(0.012, 0.012, 0.01, 5), -0.04, 0.1, 0.27), 0x111111],
+          ...[[1, 1], [-1, 1], [1, -1], [-1, -1]].map(([sx, sz]) => [B(0.1, 0.025, 0.03, sx * 0.1, 0.03, sz * 0.1, 0, sx * sz * 0.5, 0), c])]
+        : [[place(ell(0.09, 0.075, 0.13, 8), 0, 0.08, 0), c], [place(ell(0.055, 0.05, 0.065, 8), 0, 0.1, 0.13), c], [place(ell(0.03, 0.035, 0.01, 6), 0.035, 0.155, 0.11), c], [place(ell(0.03, 0.035, 0.01, 6), -0.035, 0.155, 0.11), c],
+          [place(ell(0.01, 0.01, 0.008, 5), 0.028, 0.115, 0.185), 0x111111], [place(ell(0.01, 0.01, 0.008, 5), -0.028, 0.115, 0.185), 0x111111], [CY(0.012, 0.006, 0.22, 5, 0, 0.06, -0.2, Math.PI / 2 - 0.3, 0, 0), c]];
+      const mesh = flatMesh(parts, personMat); mesh.scale.setScalar(k); mesh.castShadow = false; scene.add(mesh);
+      critters.push({ mesh, x: s.x, z: s.z, home: { x: s.x, z: s.z }, yaw: rand(0, TAU), speed: 0, state: 'idle', timer: rand(0, 4), gone: false, respawnT: 0, lizard, phase: 0, name: lizard ? 'lizard' : 'small mammal' });
+    }
+  }
+  function updateCritters(dt, t) {
+    const low = player.kind !== 'quetz' || P.y - terrainH(P.x, P.z) < 12;
+    for (const c of critters) {
+      if (c.gone) { if ((c.respawnT -= dt) <= 0 && Math.hypot(c.home.x - P.x, c.home.z - P.z) > 70) { c.gone = false; c.mesh.visible = true; c.x = c.home.x; c.z = c.home.z; } continue; }
+      const dd = Math.hypot(c.x - P.x, c.z - P.z);
+      if (dd > 170) continue;
+      if (low && !life.dead && dd < 6 + P.speed * 0.6 && c.state !== 'flee') { c.state = 'flee'; c.timer = rand(1.2, 2.2); }
+      if (c.state === 'flee') {
+        c.timer -= dt;
+        c.yaw = angleLerp(c.yaw, Math.atan2(c.x - P.x, c.z - P.z) + Math.sin(t * 7 + c.home.x) * 0.7, 1 - Math.exp(-8 * dt));
+        c.speed = damp(c.speed, c.lizard ? 6.5 : 5.5, 8, dt);
+        if (c.timer <= 0) { c.state = 'idle'; c.timer = rand(0.4, 1.5); }
+      } else if (c.state === 'idle') {
+        c.speed = damp(c.speed, 0, 10, dt);
+        if ((c.timer -= dt) <= 0) {
+          c.state = 'walk'; c.timer = rand(0.5, 1.8); c.yaw += rand(-1.5, 1.5);
+          if (Math.hypot(c.x - c.home.x, c.z - c.home.z) > 25) c.yaw = Math.atan2(c.home.x - c.x, c.home.z - c.z);
+        }
+      } else { c.speed = damp(c.speed, 1.4, 6, dt); if ((c.timer -= dt) <= 0) { c.state = 'idle'; c.timer = rand(1, 4); } }
+      const nx = c.x + Math.sin(c.yaw) * c.speed * dt, nz = c.z + Math.cos(c.yaw) * c.speed * dt, h = terrainH(nx, nz);
+      if (h > WATER_Y + 0.3 && h < 40 && !nearViewpoint(nx, nz)) { c.x = nx; c.z = nz; } else c.yaw += 2;
+      c.phase += c.speed * dt * 9;
+      c.mesh.position.set(c.x, terrainH(c.x, c.z) + Math.abs(Math.sin(c.phase)) * 0.03, c.z);
+      c.mesh.rotation.set(0, c.yaw + (c.lizard ? Math.sin(c.phase) * 0.3 : 0), 0);
+    }
+  }
+  function catchCritter(c, how) {
+    c.gone = true; c.mesh.visible = false; c.respawnT = rand(40, 90);
+    const gain = feed(4);
+    Sound.squeak({ x: c.x, y: terrainH(c.x, c.z), z: c.z }); Sound.gulp();
+    challenge('critters', 1); if (how === 'swoop') challenge('swoop', 1);
+    note((how === 'swoop' ? 'Snatched a ' : 'Caught a ') + c.name + (gain >= 1 ? ' (+' + Math.round(gain) + ' food)' : ''));
+  }
+
+  const fishes = [];
+  {
+    const fishGeo = merge([paint(place(ell(0.13, 0.1, 0.38, 10), 0, 0, 0), { top: 0x4e5f66, belly: 0xd8dfe0, yBelly: -0.05, yTop: 0.08 }),
+      paint(place(new THREE.ConeGeometry(0.14, 0.24, 4).scale(0.25, 1, 1), 0, 0, -0.45, Math.PI / 2, 0, 0), flatPal, 0x5a6a70)]);
+    const fishMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.35, metalness: 0.4 });
+    LAKES.forEach(L => {
+      for (let i = 0; i < 6; i++) {
+        const mesh = new THREE.Mesh(fishGeo, fishMat); mesh.scale.setScalar(rand(0.9, 1.6)); scene.add(mesh);
+        fishes.push({ mesh, L, a: rand(0, TAU), r: L.r * rand(0.45, 0.82), dir: Math.random() < 0.5 ? 1 : -1, speed: rand(0.8, 1.8), jumpT: rand(3, 25), jumpP: 0, x: L.x, z: L.z, y: -0.8, gone: false, respawnT: 0 });
+      }
+    });
+    fishes.geo = fishGeo; fishes.mat = fishMat;
+  }
+  function updateFish(dt) {
+    for (const f of fishes) {
+      if (f.gone) { if ((f.respawnT -= dt) <= 0) { f.gone = false; f.mesh.visible = true; } continue; }
+      if (Math.abs(f.L.x - camera.position.x) > 420 || Math.abs(f.L.z - camera.position.z) > 420) continue;
+      f.a += f.dir * f.speed / f.r * dt;
+      f.x = f.L.x + Math.cos(f.a) * f.r; f.z = f.L.z + Math.sin(f.a) * f.r;
+      let y = Math.min(-0.45, Math.max(terrainH(f.x, f.z) + 0.3, -1.0)), pitch = 0;
+      if (f.jumpP > 0) {
+        f.jumpP -= dt / 0.9; const p = 1 - f.jumpP; y += 2.0 * Math.sin(Math.PI * clamp(p, 0, 1)); pitch = -Math.cos(Math.PI * p) * 0.9;
+        if (f.jumpP <= 0) splash(f.x, f.z, 0.4);
+      } else if ((f.jumpT -= dt) <= 0) { f.jumpT = rand(8, 30); f.jumpP = 1; splash(f.x, f.z, 0.35); }
+      f.y = y;
+      f.mesh.position.set(f.x, y, f.z);
+      f.mesh.rotation.set(pitch, Math.atan2(-Math.sin(f.a) * f.dir, Math.cos(f.a) * f.dir), 0, 'YXZ');
+    }
+  }
+  // the nearest fish within reach of a mouth dipped into the water, or, failing that, a lucky catch
+  function tryFish(x, z, reach, luck) {
+    let best = null, bd = reach;
+    for (const f of fishes) { if (f.gone) continue; const dd = Math.hypot(f.x - x, f.z - z); if (dd < bd) { bd = dd; best = f; } }
+    if (!best && Math.random() < luck) best = fishes.find(f => !f.gone && f.L === LAKES[nearestLake(x, z)]);
+    if (best) { best.gone = true; best.mesh.visible = false; best.respawnT = rand(25, 50); }
+    return best;
+  }
+  function nearestLake(x, z) { let bi = 0, bd = 1e9; LAKES.forEach((L, i) => { const d = Math.hypot(x - L.x, z - L.z) - L.r; if (d < bd) { bd = d; bi = i; } }); return bi; }
+  // a fish held crosswise in the jaws for a moment before it is swallowed
+  const carried = [];
+  function carryFish(getPos, getYaw, scale) {
+    const mesh = new THREE.Mesh(fishes.geo, fishes.mat); mesh.scale.setScalar(scale); scene.add(mesh);
+    carried.push({ mesh, getPos, getYaw, t: 1.4 });
+  }
+  function updateCarried(dt, t) {
+    for (let i = carried.length - 1; i >= 0; i--) {
+      const c = carried[i]; c.t -= dt;
+      if (c.t <= 0) { scene.remove(c.mesh); carried.splice(i, 1); continue; }
+      c.mesh.position.copy(c.getPos()); c.mesh.rotation.set(0, c.getYaw() + Math.PI / 2, Math.sin(t * 18) * 0.3);
+    }
+  }
+  const _hp = new THREE.Vector3(), _hd = new THREE.Vector3();
+  // world position of a point some way along an animal's head (its snout), used to put a catch in its jaws
+  function snoutOf(head, along) { head.getWorldPosition(_hp); head.getWorldDirection(_hd); return _hp.addScaledVector(_hd, along); }
+
+  // ---------------------------------------------------------------------------
+  // Survival: health, hunger, stamina and growing up
+  // ---------------------------------------------------------------------------
+  const life = {
+    mode: store.get('life', 'grow'), growth: store.get('growth', {}),
+    health: 100, hunger: 75, stamina: 100, exhausted: false, exert: 0, tranqT: 0,
+    eating: null, drinking: false, idleT: 0, chewT: 0, dead: false, deadT: 0,
+    latched: null, latchT: 0, latchBite: 0, latchSide: 1, knock: { x: 0, z: 0 }, huntedT: 0, chaseT: 0, chargeT: 0, fishT: 0, saveT: 0,
+    photos: new Set(),
+  };
+  const STAGES = [[0.5, 'Hatchling'], [0.75, 'Juvenile'], [0.97, 'Sub-adult'], [9, 'Adult']];
+  const stageOf = g => STAGES.findIndex(s => g < s[0]);
+  function growthOf(kind) { if (kind === 'quetz' || life.mode === 'adult') return 1; const g = life.growth[kind]; return g == null ? 0.35 : g; }
+  function playerMass() { const g = growthOf(player.kind); return SPECIES[CHAR[player.kind].name].mass * g * g * g; }
+  // smaller animals fill up on less meat
+  const appetite = () => clamp(Math.sqrt(playerMass() / 8), 0.12, 1);
+  function feed(meat) {
+    const gain = Math.max(0, Math.min(100 - life.hunger, meat / appetite()));
+    life.hunger += gain;
+    if (life.mode === 'grow' && player.kind !== 'quetz') grow(gain);
+    return gain;
+  }
+  function grow(gain) {
+    const kind = player.kind, g0 = growthOf(kind);
+    if (g0 >= 1 || gain <= 0) return;
+    const g = Math.min(1, g0 + gain * 0.0011);
+    life.growth[kind] = g; life.saveT = 1;
+    if (stageOf(g) > stageOf(g0)) { toast('You have grown! Now a ' + STAGES[stageOf(g)][1].toLowerCase()); challenge('grow', 1); Sound.chime(); }
+    applyGrowth();
+  }
+  // size changes everything: the model, stride, reach, the camera, how fast it runs and how hard it bites
+  function applyGrowth() {
+    const d = player.dino; if (!d) return;
+    const g = growthOf(player.kind), b = d.box1;
+    d.group.scale.setScalar(g); d.stride = d.baseStride / g;
+    d.box = { x: b.x * g, z0: b.z0 * g, z1: b.z1 * g, y: b.y * g };
+  }
+  function runSpeed() {
+    const cfg = CHAR[player.kind], g = growthOf(player.kind);
+    return cfg.run * (0.62 + 0.38 * g) * (life.exhausted ? 0.55 : 1) * (life.tranqT > 0 ? 0.6 : 1);
+  }
+  // the player, seen as a threat by the animals around it
+  const PF = {
+    isPlayer: true, name: 'you',
+    get x() { return P.x; }, get z() { return P.z; }, get yaw() { return P.yaw; }, get mass() { return playerMass(); },
+    get dead() { return life.dead; }, get speedNow() { return P.speed; },
+    get box() { return player.dino ? player.dino.box : { x: 0.8, z0: -1.5, z1: 2.5, y: 3 }; },
+  };
+  function hurtPlayer(dmg, fromX, fromZ, knock, msg, cap) {
+    if (life.dead) return;
+    const pct = Math.min(cap || 45, 100 * dmg / maxHp(Math.max(playerMass(), 0.05)));
+    life.health -= pct;
+    alertMsg(msg); Sound.hurt();
+    if (knock && player.dino) { const a = Math.atan2(P.x - fromX, P.z - fromZ); life.knock.x = Math.sin(a) * knock; life.knock.z = Math.cos(a) * knock; }
+    life.latched = null;
+    if (life.health <= 0) collapse('You collapsed from your wounds');
+  }
+  function collapse(msg) {
+    life.dead = true; life.deadT = 0; life.health = 0; life.latched = null; life.eating = null;
+    alertMsg(msg);
+    if (life.mode === 'grow' && player.kind !== 'quetz') { life.growth[player.kind] = Math.max(0.35, growthOf(player.kind) - 0.08); life.saveT = 1; }
+  }
+  function respawnPlayer() {
+    Object.assign(life, { dead: false, health: 100, hunger: 70, stamina: 100, exhausted: false, tranqT: 0, knock: { x: 0, z: 0 } });
+    const s = landSpot(3, 20, 450, 80, (x, z) => dinos.every(o => !o.carnivore || o.dead || Math.hypot(o.x - x, o.z - z) > 120)) || { x: 60, z: -240 };
+    for (const o of dinos) { o.hunt = 0; o.provoked = 0; }
+    if (player.kind === 'quetz') { P.x = s.x; P.z = s.z; P.y = terrainH(s.x, s.z) + 45; P.mode = 'fly'; P.speed = 26; P.pitch = 0; P.fold = 0; P.legOut = 0; }
+    else { const d = player.dino; d.x = s.x; d.z = s.z; d.speedNow = 0; d.groundY = null; d.group.rotation.z = 0; d.yOff = 0; applyGrowth(); }
+    camInit = false;
+    fadeEl.style.opacity = 0;
+    note('A new start' + (player.kind !== 'quetz' && life.mode === 'grow' ? ' (' + STAGES[stageOf(growthOf(player.kind))][1].toLowerCase() + ')' : ''));
+  }
+  function updateSurvival(dt) {
+    if (life.saveT > 0 && (life.saveT -= dt) <= 0) store.set('growth', life.growth);
+    if (life.dead) { life.deadT += dt; if (life.deadT > 1.2) fadeEl.style.opacity = 1; if (life.deadT > 3.6) respawnPlayer(); return; }
+    const young = player.kind !== 'quetz' && growthOf(player.kind) < 0.97;
+    const drain = (player.kind === 'quetz' ? 0.2 : 0.28) * (young ? 1.2 : 1) + 0.3 * life.exert;
+    life.hunger = Math.max(0, life.hunger - drain * dt);
+    if (life.exert > 0.5) life.stamina -= 11 * life.exert * dt;
+    else life.stamina += (life.hunger > 15 ? 13 : 5) * (life.drinking ? 3 : 1) * dt;
+    life.stamina = clamp(life.stamina, 0, 100);
+    if (life.stamina <= 0) life.exhausted = true; else if (life.exhausted && life.stamina > 35) life.exhausted = false;
+    if (life.tranqT > 0) life.tranqT -= dt;
+    if (life.hunger <= 0) { life.health -= 1.2 * dt; if (life.health <= 0) collapse('You starved'); }
+    else if (life.hunger > 40) life.health = Math.min(100, life.health + 0.8 * dt);
+    // being hunted and getting away
+    if (dinos.some(o => o.hunt > 0)) life.huntedT += dt;
+    else { if (life.huntedT > 4) { challenge('escape', 1); note('You got away'); } life.huntedT = 0; }
+    if (life.chargeT > 0 && (life.chargeT -= dt) <= 0) challenge('charge', 1);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Bodies, bites and kills
+  // ---------------------------------------------------------------------------
+  // distance from a point to an animal's body footprint (a carcass lies on its side, so it is wider and shifted)
+  function bodyDist(t, x, z) {
+    const b = t.box, dx = x - t.x, dz = z - t.z, c = Math.cos(t.yaw), s = Math.sin(t.yaw);
+    let lx = dx * c - dz * s; const lz = dx * s + dz * c;
+    let hx = b.x;
+    if (t.dead) { lx += (t.side || 1) * b.y * 0.4; hx = Math.max(b.x, b.y * 0.45); }
+    return Math.hypot(Math.max(0, Math.abs(lx) - hx), Math.max(0, lz - b.z1, b.z0 - lz));
+  }
+  const _mouth = { x: 0, z: 0 };
+  function mouthOf(d) { const f = d.box.z1 * 0.92; _mouth.x = d.x + Math.sin(d.yaw) * f; _mouth.z = d.z + Math.cos(d.yaw) * f; return _mouth; }
+  const reachOf = d => 0.6 + 0.08 * (d.box.z1 - d.box.z0);
+  function damageDino(t, dmg, by) {
+    if (t.dead) return;
+    t.hp -= dmg;
+    const bx = t.x, bz = t.z;
+    blood(bx, (t.groundY || 0) + t.box.y * 0.45, bz, Math.round(6 + Math.min(dmg, 60) / 4));
+    if (t.hp <= 0) { killDino(t, by); return; }
+    react(t, by === 'player' ? PF : by, true);
+    if (by === 'player') { addShow(20, bx, bz); incident(bx, bz, 1); }
+  }
+  // How a plant-eater responds to a threat: an adult of a species that fights stands its ground if the
+  // attacker isn't overwhelmingly bigger; everything else runs if the threat is big enough to matter.
+  function react(t, foe, attacked) {
+    if (t.dead || t.role === 'swim' || !foe) return false;
+    if (t.carnivore) {
+      if (!foe.isPlayer) return false;
+      if (t.mass > foe.mass * 0.7) { t.provoked = 20; t.hunt = Math.max(t.hunt, 4); } else { t.flee = rand(5, 8); t.fleeFrom = foe; }
+      return true;
+    }
+    const sp = SPECIES[t.base] || {};
+    if (sp.def && t.k >= 0.9 && foe.mass < t.mass * 2.2 && t.hp > maxHp(t.mass) * 0.35) {
+      if (t.defend <= 0) t.roarT = 1.6;
+      t.defend = attacked ? 12 : 9; t.foe = foe; t.flee = 0; t.drinking = false; t.aware = 1;
+      return false;
+    }
+    if (foe.mass > t.mass * 0.12 || attacked) {
+      const was = t.flee > 0;
+      if (!was) t.fleeN = (t.fleeN || 0) + 1;
+      t.flee = rand(5, 8); t.fleeFrom = foe; t.drinking = false; t.state = 'walk'; t.aware = 1; t.calmT = 0;
+      t.minH = Math.min(t.minH, WATER_Y + 0.6);   // drinkers stand on the low shore, so let them run across it
+      return !was;
+    }
+    return false;
+  }
+  // alarm spreads through a herd and to any plant-eaters close by; a big enough panic is a stampede
+  let alarmStamp = 0;
+  function alarm(src, foe, radius) {
+    const stamp = ++alarmStamp, q = [src]; let n = 0;
+    src.alarmStamp = stamp;
+    while (q.length) {
+      const a = q.shift();
+      for (const o of dinos) {
+        if (o.alarmStamp === stamp || o.dead || o.carnivore || o.role === 'swim') continue;
+        if ((o.herd && o.herd === a.herd) || Math.hypot(o.x - a.x, o.z - a.z) < radius) { o.alarmStamp = stamp; if (react(o, foe, false)) n++; q.push(o); }
+      }
+    }
+    if (foe && foe.isPlayer) stampede(n + (src.flee > 0 ? 1 : 0), src.x, src.z);
+    return n;
+  }
+  function stampede(n, x, z) {
+    if (n < 6) return;
+    challenge('stampede', 1); addShow(60, x, z); note('Stampede! ' + n + ' animals on the run');
+  }
+  function killDino(t, by) {
+    const byP = by === 'player';
+    Object.assign(t, { dead: true, hp: 0, meat: meatOf(t.mass), deadT: 0, sinkT: 0, side: Math.random() < 0.5 ? 1 : -1, killer: byP ? 'player' : by ? by.name : '?', scavenged: false,
+      flee: 0, defend: 0, hunt: 0, prey: null, eating: null, speedNow: 0, drinking: false, lungeT: 0, lungeK: 0, lungeJaw: 0, aware: 0, headDown: 0, swingK: 0 });
+    t.yaw = t.group.rotation.y;
+    Sound.thud({ x: t.x, y: (t.groundY || 0) + 1, z: t.z });
+    promoteHerd(t);
+    alarm(t, byP ? PF : by, 45);
+    for (const v of VIEWPOINTS) if (Math.hypot(v.x - t.x, v.z - t.z) < 75) v.panicT = Math.max(v.panicT || 0, 4);
+    circleScavengers(t);
+    for (const o of dinos) if (o.prey === t && o !== by) o.prey = null;
+    if (byP) {
+      challenge('kills', 1); if (t.base === 'Triceratops' && t.k >= 0.9) challenge('trike', 1);
+      toast('You brought down a ' + t.name + '!'); addShow(150, t.x, t.z); incident(t.x, t.z, 2);
+    } else if (by && by.carnivore) { by.eating = t; by.eatT = 0; by.prey = null; }
+  }
+  function updateCarcass(d, dt) {
+    const g = d.group;
+    if (d.gone) { if ((d.respawnT -= dt) <= 0) respawnDino(d); return; }
+    d.deadT += dt;
+    const k = smoothstep(0, 1.1, d.deadT);
+    if (d.meat <= 0 || d.deadT > 200) d.sinkT += dt;
+    g.position.set(d.x, terrainH(d.x, d.z) + k * d.box.x * 0.9 - d.sinkT * (0.25 + d.box.y * 0.06), d.z);
+    g.rotation.set(0, d.yaw, d.side * k * 1.45);
+    for (const L of d.legs) { L.hip.rotation.x = damp(L.hip.rotation.x, 0.3, 3, dt); L.knee.rotation.x = damp(L.knee.rotation.x, L.kneeRest + 0.4, 3, dt); }
+    d.jaw.rotation.x = damp(d.jaw.rotation.x, 0.3, 3, dt);
+    if (d.sinkT > 6) { g.visible = false; d.gone = true; d.respawnT = rand(40, 80); }
+  }
+  function respawnDino(d) {
+    const h = d.herd, lead = h && h.lead && !h.lead.dead && h.lead !== d ? h.lead : null;
+    let x, z, yaw, role;
+    if (lead) { if (!d.off) d.off = { x: rand(-6, 6), z: rand(-6, 6) }; x = lead.x + d.off.x; z = lead.z + d.off.z; yaw = lead.yaw; role = 'follower'; }
+    else { x = d.spawn.x; z = d.spawn.z; yaw = d.spawn.yaw; role = d.spawn.role === 'follower' ? 'wander' : d.spawn.role; }
+    if (Math.hypot(x - P.x, z - P.z) < 150 || terrainH(x, z) < d.minH) { d.respawnT = 10; return; }
+    if (lead) d.leader = lead;
+    else if (h) { h.lead = d; for (const m of h.members) if (!m.dead && m !== d && m.role === 'follower') m.leader = d; }
+    Object.assign(d, { dead: false, gone: false, x, z, yaw, role, hp: maxHp(d.mass), meat: 0, flee: 0, fleeN: 0, defend: 0, aware: 0, prey: null, eating: null, hunt: 0, provoked: 0,
+      state: 'idle', timer: 2, speedNow: 0, groundY: null, drinking: role === 'drinker', sinkT: 0, deadT: 0, killer: null });
+    if (role === 'wander') d.home = { x, z };
+    d.group.visible = true; d.group.rotation.set(0, yaw, 0);
+  }
+  // pterosaurs gather and wheel over a fresh kill
+  function circleScavengers(t) {
+    let best = null, bd = 450;
+    for (const f of flocks) { if (f.over || f.radius > 300) continue; const dd = Math.hypot(f.cx - t.x, f.cz - t.z); if (dd < bd) { bd = dd; best = f; } }
+    if (best) { best.home = best.home || { cx: best.cx, cz: best.cz, alt: best.alt, radius: best.radius }; best.over = t; }
+  }
+  function updateFlockTargets(dt) {
+    for (const f of flocks) {
+      if (!f.home) continue;
+      if (f.over && (!f.over.dead || f.over.gone || f.over.sinkT > 0)) f.over = null;
+      const tg = f.over ? { cx: f.over.x, cz: f.over.z, alt: terrainH(f.over.x, f.over.z) + 30, radius: 24 } : f.home;
+      f.cx = damp(f.cx, tg.cx, 0.25, dt); f.cz = damp(f.cz, tg.cz, 0.25, dt); f.alt = damp(f.alt, tg.alt, 0.3, dt); f.radius = damp(f.radius, tg.radius, 0.3, dt);
+      f.angSpeed = f.speed / f.radius;
+      if (!f.over && Math.abs(f.cx - f.home.cx) < 1 && Math.abs(f.radius - f.home.radius) < 1) f.home = null;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // What the plant-eaters notice, and how they fight back
+  // ---------------------------------------------------------------------------
+  // They hear a running animal from far off and a careful one only up close, see movement in a wide arc
+  // around them, and notice big predators from further away than small ones.
+  function sense(d, dt) {
+    if ((d.senseT -= dt) > 0) return;
+    const step = 0.3 + Math.random() * 0.1; d.senseT = step;
+    if (d.flee <= 0) { d.calmT = (d.calmT || 0) + step; if (d.calmT > 25) d.fleeN = 0; }
+    if (d.chasedBy) {
+      const c = d.chasedBy;
+      if (c.dead || c.prey !== d) d.chasedBy = null;
+      else if (Math.hypot(c.x - d.x, c.z - d.z) < 45 && d.flee <= 0 && d.defend <= 0) { react(d, c, false); alarm(d, c, 30); return; }
+    }
+    if (life.dead) { d.aware = Math.max(0, d.aware - step); return; }
+    const pm = playerMass(), dx = P.x - d.x, dz = P.z - d.z, dd = Math.hypot(dx, dz);
+    const airborne = player.kind === 'quetz' && P.mode !== 'ground';
+    let gain = 0;
+    if (!airborne && dd < 120 && (pm > d.mass * 0.12 || d.defend > 0)) {
+      const sizeK = clamp(0.5 + 0.25 * Math.cbrt(pm), 0.5, 1.2), spd = P.speed, run = player.kind === 'quetz' ? WALK_SPEED : runSpeed();
+      const H = (spd > 0.6 * run ? 42 : spd > 0.35 * run ? 18 : spd > 0.3 ? 8 : 0) * sizeK, Sg = 70 * sizeK;
+      if (dd < H) gain += 3;
+      const facing = Math.abs(wrapA(Math.atan2(dx, dz) - d.yaw)) < 1.9;
+      if (facing && dd < Sg) gain += 1.2 * Math.pow(1 - dd / Sg, 2) * (spd > 0.3 ? 1 : 0.5) * (d.drinking ? 0.5 : 1);
+    }
+    d.aware = clamp(d.aware + (gain > 0 ? gain : -0.25) * step, 0, 1.2);
+    if (d.aware > 0.35) { d.lookX = P.x; d.lookZ = P.z; }
+    if (d.aware >= 1 && d.flee <= 0 && d.defend <= 0) { react(d, PF, false); alarm(d, PF, 35); }
+  }
+  function updateDefend(d, dt, t) {
+    const f = d.foe;
+    if (!f || f.dead) { d.defend = 0; }
+    else {
+      d.defend -= dt; d.drinking = false;
+      const dx = f.x - d.x, dz = f.z - d.z, dist = Math.hypot(dx, dz), toFoe = Math.atan2(dx, dz);
+      d.lookX = f.x; d.lookZ = f.z;
+      if (dist > 70) d.defend = 0;
+      const sp = SPECIES[d.base]; d.defCd = Math.max(0, (d.defCd || 0) - dt);
+      if (sp.def === 'charge') {
+        if (d.chargeT > 0) {
+          // head down, horns (or dome) first, at full tilt
+          d.chargeT -= dt; d.headDown = 1;
+          moveToward(d, f.x, f.z, d.speed * 3.2, dt, 0, 2.5);
+          const fx = d.x + Math.sin(d.yaw) * d.box.z1, fz = d.z + Math.cos(d.yaw) * d.box.z1;
+          if (bodyDist(f, fx, fz) < 1.0 + d.box.x * 0.3) { hitFoe(d, f, 22 * Math.sqrt(d.mass)); d.chargeT = 0; d.defCd = 3; d.speedNow = -2; }
+        } else {
+          d.headDown = 0.6;
+          d.speedNow = damp(d.speedNow, 0, 4, dt); d.yaw = angleLerp(d.yaw, toFoe, 1 - Math.exp(-3 * dt));
+          if (d.defCd <= 0 && dist < 26 * d.k + d.box.z1 && Math.abs(wrapA(toFoe - d.yaw)) < 0.5) d.chargeT = 2.2;
+        }
+      } else {
+        // turn the weapon (tail club, spikes or whip) towards the attacker and swing it
+        const away = toFoe + Math.PI;
+        d.speedNow = damp(d.speedNow, 0, 4, dt);
+        d.yaw = angleLerp(d.yaw, away + Math.sin(t * 1.3 + d.seed) * 0.25, 1 - Math.exp(-2 * dt));
+        if (d.swingT > 0) {
+          d.swingT -= dt; const p = 1 - d.swingT / 0.9; d.swingK = Math.sin(p * TAU);
+          if (!d.swung && p > 0.35) {
+            d.swung = true;
+            const tl = -d.box.z0 * 0.85, sw = d.yaw + Math.PI + d.swingK * 0.5, tx = d.x + Math.sin(sw) * tl, tz = d.z + Math.cos(sw) * tl;
+            if (bodyDist(f, tx, tz) < 2.5 + d.box.x * 0.5 || bodyDist(f, (tx + d.x) / 2, (tz + d.z) / 2) < 2) hitFoe(d, f, 22 * Math.sqrt(d.mass));
+          }
+        } else {
+          d.swingK = damp(d.swingK, 0, 6, dt);
+          if (d.defCd <= 0 && dist < -d.box.z0 + 6 && Math.abs(wrapA(away - d.yaw)) < 0.8) { d.swingT = 0.9; d.swung = false; d.defCd = 2.2; }
+        }
+      }
+      if (d.hp < maxHp(d.mass) * 0.35) { d.defend = 0; d.flee = rand(6, 9); d.fleeFrom = f; }
+    }
+    if (d.defend <= 0) { d.headDown = 0; d.chargeT = 0; d.swingT = 0; }
+  }
+  function hitFoe(d, f, dmg) {
+    Sound.thud({ x: f.x, y: (d.groundY || 0) + 1.5, z: f.z });
+    if (f.isPlayer) {
+      const how = d.base === 'Triceratops' ? ' gored you!' : SPECIES[d.base].def === 'charge' ? ' rammed you!' : ' clubbed you with its tail!';
+      hurtPlayer(dmg, d.x, d.z, 10, 'The ' + d.name + how);
+      if (d.base === 'Triceratops' && SPECIES[d.base].def === 'charge') life.chargeT = 3;
+      addShow(15, d.x, d.z);
+    } else {
+      damageDino(f, dmg * 0.4, d);
+      if (!f.dead) { f.repelled = (f.repelled || 0) + 1; f.prey = null; f.hungerT = rand(60, 120); f.flee = 3; f.fleeFrom = d; }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Meat-eaters get hungry every few minutes and go hunting, scavenging or (the Spinosaurus) fishing
+  // ---------------------------------------------------------------------------
+  function npcBite(d, p) {
+    const sp = SPECIES[p.base] || {}, mp = mouthOf(d);
+    Sound.bite({ x: mp.x, y: (d.groundY || 0) + d.box.y * 0.5, z: mp.z }, d.mass > 1);
+    // a defending adult can drive the attacker off
+    if (sp.def && p.k >= 0.9 && p.defend > 0 && Math.random() > d.mass / (d.mass + p.mass * 1.2)) {
+      d.repelled = (d.repelled || 0) + 1; d.speedNow = -3;
+      if (d.repelled >= 2) { d.prey = null; d.repelled = 0; d.hungerT = rand(60, 120); d.flee = 3; d.fleeFrom = p; }
+      return;
+    }
+    damageDino(p, 45 * Math.sqrt(d.mass), d);
+  }
+  function updatePredator(d, dt) {
+    const sp = SPECIES[d.base] || {};
+    if (d.role === 'follower') { const L = d.leader; if (L && !L.dead && L.base === d.base) { if (L.prey && !L.prey.dead) d.prey = L.prey; if (L.eating) { d.eating = L.eating; d.eatT = d.eatT || 0; } } }
+    if (d.eating) {
+      const c = d.eating;
+      if (!c.dead || c.gone || c.meat <= 0 || (d.eatT += dt) > 40) { d.stuckT = 0; d.eating = null; d.drinking = false; d.hungerT = rand(200, 480); return false; }
+      const m = mouthOf(d);
+      const cd = bodyDist(c, m.x, m.z);
+      // walk up to it; a body lying at the water's edge can be reached with a stretch from the bank
+      if (cd > reachOf(d) + 0.5 && !(d.stuckT > 0.5 && cd < reachOf(d) + 4)) { d.drinking = false; if (moveToward(d, c.x, c.z, d.speed * 1.3, dt, 0.5) === 'blocked') { d.speedNow = 0; d.stuckT = (d.stuckT || 0) + dt; } }
+      else { d.speedNow = damp(d.speedNow, 0, 6, dt); d.drinking = true; d.yaw = angleLerp(d.yaw, Math.atan2(c.x - d.x, c.z - d.z), 1 - Math.exp(-2 * dt)); c.meat -= dt * 2 * Math.sqrt(d.mass); if ((d.chewT = (d.chewT || 0) - dt) <= 0) { d.chewT = rand(0.5, 0.9); Sound.chew({ x: m.x, y: d.groundY || 0, z: m.z }); } }
+      return true;
+    }
+    if (sp.fisher && d.role !== 'follower') return updateFishing(d, dt);
+    if (d.prey) {
+      const p = d.prey;
+      if (p.dead) { d.eating = p; d.eatT = 0; d.prey = null; return true; }
+      if ((d.preyT -= dt) <= 0 || Math.hypot(p.x - d.x, p.z - d.z) > 220) { d.prey = null; d.hungerT = rand(40, 90); return false; }
+      p.chasedBy = d;
+      const m = mouthOf(d), dd = bodyDist(p, m.x, m.z), reach = reachOf(d);
+      if (dd > reach) { if (moveToward(d, p.x, p.z, d.runSpeed * 0.95, dt, 0, 3) === 'blocked') d.speedNow *= 0.5; }
+      else { d.speedNow = damp(d.speedNow, Math.max(0, p.speedNow) * 0.9, 4, dt); d.yaw = angleLerp(d.yaw, Math.atan2(p.x - d.x, p.z - d.z), 1 - Math.exp(-4 * dt)); }
+      if (d.lungeT <= 0 && d.lungeCd <= 0 && dd < reach * 1.3) { d.lungeT = 1.0; d.lungeCd = 1.6; d.snapped = false; }
+      tickLunge(d, dt, () => { const mm = mouthOf(d); if (bodyDist(p, mm.x, mm.z) < reach * 1.5) npcBite(d, p); else Sound.snap({ x: mm.x, y: (d.groundY || 0) + d.box.y * 0.5, z: mm.z }); });
+      d.aim = 0.1; d.drinking = false;
+      return true;
+    }
+    if (d.role === 'follower' || (d.hungerT -= dt) > 0) return false;
+    if ((d.searchT = (d.searchT || 0) - dt) > 0) return false;
+    d.searchT = 1.5;
+    // a carcass nearby is an easy meal; otherwise pick out something it can handle, the young and the weak first
+    let best = null, bs = 180;
+    for (const t of dinos) if (t.dead && !t.gone && t.meat > 5 && !t.sinkT) { const dd = Math.hypot(t.x - d.x, t.z - d.z); if (dd < bs) { bs = dd; best = t; } }
+    if (best) { d.eating = best; d.eatT = 0; return false; }
+    const max = sp.hunts || 1; bs = 1e9;
+    for (const t of dinos) {
+      if (t.dead || t.carnivore || t.role === 'swim' || t.mass > max || t.mass < max * 0.02) continue;
+      const dd = Math.hypot(t.x - d.x, t.z - d.z); if (dd > 170) continue;
+      const s = dd * (t.k < 0.9 ? 0.6 : 1) * (t.hp < maxHp(t.mass) * 0.6 ? 0.7 : 1);
+      if (s < bs) { bs = s; best = t; }
+    }
+    if (best) { d.prey = best; d.preyT = 35; d.roarT = 1.6; }
+    else d.hungerT = rand(30, 60);
+    return false;
+  }
+  // Spinosaurus wades into the shallows, stands with its snout over the water and snaps up fish
+  function updateFishing(d, dt) {
+    if ((d.hungerT -= dt) > 0 && !d.fishSpot) return false;
+    if (!d.fishSpot) {
+      const L = LAKES[nearestLake(d.x, d.z)];
+      for (let i = 0; i < 30 && !d.fishSpot; i++) { const a = rand(0, TAU), x = L.x + Math.cos(a) * L.r * 0.84, z = L.z + Math.sin(a) * L.r * 0.84, h = terrainH(x, z); if (h < -0.6 && h > d.minH + 0.4) d.fishSpot = { x, z, L, caught: 0 }; }
+      if (!d.fishSpot) { d.hungerT = rand(60, 120); return false; }
+      d.fishT = 3;
+    }
+    const s = d.fishSpot;
+    if (Math.hypot(s.x - d.x, s.z - d.z) > 3) { d.drinking = false; if (moveToward(d, s.x, s.z, d.speed * 1.2, dt, 2.5) === 'blocked') { d.fishSpot = null; d.hungerT = rand(20, 40); } return true; }
+    d.speedNow = damp(d.speedNow, 0, 5, dt); d.yaw = angleLerp(d.yaw, Math.atan2(s.L.x - d.x, s.L.z - d.z), 1 - Math.exp(-1.5 * dt));
+    d.drinking = d.lungeT <= 0;
+    if ((d.fishT -= dt) <= 0 && d.lungeT <= 0) { d.fishT = rand(3, 7); d.lungeT = 1; d.snapped = false; }
+    tickLunge(d, dt, () => {
+      const m = mouthOf(d); splash(m.x, m.z, 0.9);
+      if (Math.random() < 0.55) { s.caught++; carryFish(() => snoutOf(d.head, 1.6 * d.k), () => d.yaw, 1.4 * d.k); }
+      if (s.caught >= 3) { d.fishSpot = null; d.hungerT = rand(200, 450); d.drinking = false; }
+    });
+    return true;
+  }
+
+  // ---------------------------------------------------------------------------
+  // The player's mouth: biting, pouncing, eating and fishing
+  // ---------------------------------------------------------------------------
+  function playerBite() {
+    const d = player.dino, m = mouthOf(d), reach = reachOf(d), mx = m.x, mz = m.z, my = d.groundY + d.box.y * 0.5;
+    for (const c of critters) if (!c.gone && Math.hypot(c.x - mx, c.z - mz) < reach + 0.6) { catchCritter(c, 'bite'); return; }
+    let best = null, bd = 1e9;
+    for (const t of dinos) {
+      if (t.dead || t.role === 'swim' || Math.abs(t.x - mx) > 45 || Math.abs(t.z - mz) > 45) continue;
+      const dd = bodyDist(t, mx, mz); if (dd < reach && dd < bd) { bd = dd; best = t; }
+    }
+    if (best) {
+      const dmg = 45 * Math.sqrt(playerMass());
+      Sound.bite({ x: mx, y: my, z: mz }, playerMass() > 1);
+      damageDino(best, dmg, 'player');
+      // a raptor that lands on something no bigger than a duckbill clings on and keeps biting
+      if (player.kind === 'raptor' && !best.dead && best.mass <= 3.5) {
+        life.latched = best; life.latchT = 6; life.latchBite = 0.5;
+        life.latchSide = wrapA(Math.atan2(d.x - best.x, d.z - best.z) - best.yaw) > 0 ? 1 : -1;
+      }
+      return;
+    }
+    // fish, if the mouth is in the water
+    if (terrainH(mx, mz) < WATER_Y - 0.4) {
+      splash(mx, mz, 0.8);
+      const f = tryFish(mx, mz, reach + 2.5, player.kind === 'spino' ? 0.3 : 0.1);
+      if (f) { const gain = feed(18); challenge('fish', 1); carryFish(() => snoutOf(d.head, 1.6 * growthOf(player.kind)), () => d.yaw, 1.4 * growthOf(player.kind)); note('Caught a fish' + (gain >= 1 ? ' (+' + Math.round(gain) + ' food)' : '')); }
+      return;
+    }
+    for (const j of jeeps) if (bodyDist(j, mx, mz) < reach) { biteJeep(j); return; }
+    Sound.snap({ x: mx, y: my, z: mz });
+  }
+  function biteJeep(j) {
+    j.hitT = 0.6; j.fleeT = 10; j.target = null; j.wait = 0;
+    Sound.thud({ x: j.x, y: 1, z: j.z }); Sound.scream({ x: j.x, y: 1.5, z: j.z }, 4);
+    shake = Math.max(shake, 0.4); incident(j.x, j.z, 2);
+    if (j.ranger) j.alertT = 60; else addShow(30, j.x, j.z);
+    note(j.ranger ? 'You bit the ranger jeep!' : 'The tourists are screaming!');
+  }
+  // the quetzalcoatlus feeds by skimming the lakes for fish and snatching small animals off the ground
+  const _beak = new THREE.Vector3();
+  function updateQuetzFeeding(dt, gh, overWater) {
+    if (life.dead) return;
+    snoutOf(quetz.head, 3.6); _beak.copy(_hp);
+    if (P.mode === 'fly' && overWater && P.y < WATER_Y + 2.9) {
+      if ((life.fishT -= dt) <= 0) {
+        life.fishT = 0.3;
+        emit(sparks, _beak.x, WATER_Y + 0.1, _beak.z, 5, 0xdcecf2, 2, 2.5, 0.6, 9.8);
+        const f = tryFish(_beak.x, _beak.z, 5, 0.06);
+        if (f) { splash(_beak.x, _beak.z, 0.6); const gain = feed(6); challenge('fish', 1); carryFish(() => snoutOf(quetz.head, 3.2), () => P.yaw, 0.9); note('Caught a fish' + (gain >= 1 ? ' (+' + Math.round(gain) + ' food)' : '')); P.snatch = 0.5; }
+      }
+    }
+    if ((P.mode === 'fly' && P.y - gh < 8) || P.mode === 'ground') {
+      for (const c of critters) {
+        if (c.gone || Math.abs(c.x - _beak.x) > 4 || Math.abs(c.z - _beak.z) > 4) continue;
+        if (Math.hypot(c.x - _beak.x, c.z - _beak.z) < (P.mode === 'ground' ? 1.4 : 2.6)) { catchCritter(c, P.mode === 'fly' ? 'swoop' : 'peck'); P.snatch = 0.5; break; }
+      }
+    }
+    // standing at a carcass: tear at it
+    life.eating = null;
+    if (P.mode === 'ground' && Math.abs(P.speed) < 0.3 && life.hunger < 99.5) {
+      for (const o of dinos) if (o.dead && !o.gone && o.meat > 0 && bodyDist(o, _beak.x, _beak.z) < 1.5) { life.eating = o; break; }
+      if (life.eating) eatFrom(life.eating, dt, _beak);
+    }
+  }
+  function eatFrom(c, dt, at) {
+    const meat = Math.min(c.meat, 10 * appetite() * dt);
+    c.meat -= meat; feed(meat);
+    if ((life.chewT -= dt) <= 0) { life.chewT = 0.45; Sound.chew({ x: at.x, y: terrainH(at.x, at.z) + 1, z: at.z }); if (Math.random() < 0.5) blood(at.x, terrainH(at.x, at.z) + 0.5, at.z, 3); }
+    if (c.killer !== 'player' && !c.scavenged) { c.scavenged = true; challenge('scavenge', 1); }
+  }
+
+  // ---------------------------------------------------------------------------
+  // The park: rangers, tour jeeps that run, and the show you put on for the visitors
+  // ---------------------------------------------------------------------------
+  const ranger = (function () {
+    const v = VIEWPOINTS[0], s = jeepSpot(v.x, v.z, 80) || landSpot(3, 18, 400, 120) || { x: 0, z: 0 };
+    const model = buildJeep(0, true);
+    model.group.position.set(s.x, terrainH(s.x, s.z), s.z); scene.add(model.group);
+    const j = { model, x: s.x, z: s.z, yaw: rand(0, TAU), speed: 0, maxSpeed: 11, target: null, wait: 2, home: { x: s.x, z: s.z }, wheelRot: 0, ranger: true, alertT: 0, strikes: 0, dartCd: 0, patrol: 0, retarget: 0, siren: false, fleeT: 0 };
+    jeeps.push(j);
+    return j;
+  })();
+  for (const j of jeeps) { j.box = { x: 1.0, z0: -2.3, z1: 2.4, y: 2.4 }; j.fleeT = j.fleeT || 0; j.retarget = 0; j.hitT = 0; }
+  function incident(x, z, sev) {
+    let near = false;
+    for (const v of VIEWPOINTS) if (Math.hypot(v.x - x, v.z - z) < 260) near = true;
+    for (const j of jeeps) if (Math.hypot(j.x - x, j.z - z) < 90) near = true;
+    if (!near) return;
+    if (ranger.alertT <= 0) note('Park rangers are on their way');
+    ranger.alertT = 45; ranger.strikes += sev;
+  }
+  function rangerBrain(j, dt, pd) {
+    j.alertT = Math.max(0, j.alertT - dt); j.dartCd = Math.max(0, j.dartCd - dt);
+    j.siren = j.alertT > 0;
+    if (j.siren && !life.dead && pd > 260) {
+      // too far to drive: another ranger unit takes over from somewhere closer
+      const s = jeepSpot(P.x, P.z, 160);
+      if (s && Math.hypot(s.x - P.x, s.z - P.z) > 90) { j.x = s.x; j.z = s.z; j.yaw = Math.atan2(P.x - s.x, P.z - s.z); j.target = null; j.retarget = 0; }
+    }
+    if (j.siren && !life.dead) {
+      // follow at a wary distance; back off if the animal comes for the jeep
+      if ((j.retarget -= dt) <= 0) {
+        j.retarget = 1;
+        const a = Math.atan2(j.x - P.x, j.z - P.z), keep = pd < 22 ? 55 : 32;
+        for (const o of [0, 0.6, -0.6, 1.2, -1.2]) { const x = clamp(P.x + Math.sin(a + o) * keep, -540, 540), z = clamp(P.z + Math.cos(a + o) * keep, -540, 540), h = terrainH(x, z); if (h > 2 && h < 26) { j.target = { x, z }; break; } }
+      }
+      if (pd < 60 && j.dartCd <= 0 && j.strikes >= 2 && player.kind !== 'quetz') {
+        j.dartCd = 9; life.stamina = Math.max(0, life.stamina - 50); life.tranqT = 7; life.exhausted = life.stamina < 35;
+        Sound.dart(); alertMsg('A ranger hit you with a tranquilliser dart!');
+      }
+      if (j.alertT <= 0) j.strikes = 0;
+    } else if (!j.target && (j.wait -= dt) <= 0) {
+      // patrol from deck to deck
+      const v = VIEWPOINTS[j.patrol++ % VIEWPOINTS.length], t = jeepSpot(v.x - v.sn * 30, v.z - v.cs * 30, 40);
+      if (t) j.target = t; j.wait = rand(4, 10);
+    }
+  }
+
+  // visitors at a deck score whatever you do within sight of it
+  function addShow(pts, x, z) {
+    for (const v of VIEWPOINTS) {
+      if (v.panicking || Math.hypot(v.x - x, v.z - z) > 170) continue;
+      v.show = (v.show || 0) + pts; v.showIdle = 0;
+      challenge('show', v.show, 'max');
+    }
+  }
+  function updateShows(dt) {
+    for (const v of VIEWPOINTS) {
+      const dv = Math.hypot(P.x - v.x, P.z - v.z), low = P.y - terrainH(P.x, P.z) < 60;
+      if (dv > 25 && dv < 90 && low && !life.dead && !v.panicking) addShow(2 * dt, v.x, v.z);
+      if (v.show > 0) {
+        v.showIdle = (v.showIdle || 0) + (dv > 180 ? dt : 0);
+        if (v.showIdle > 12) { if (v.show >= 20) note('Show over at ' + v.name + ': ' + Math.round(v.show) + ' points'); v.best = Math.max(v.best || 0, v.show); v.show = 0; v.showIdle = 0; }
+      }
+    }
+  }
+  function onPhoto(v, p) {
+    Sound.shutter({ x: v.x, y: v.F + 1.5, z: v.z });
+    if (life.photos.has(p)) return;
+    life.photos.add(p); challenge('photo', 1); addShow(4, v.x, v.z);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Daily park challenges: the same four for everyone on a given day, saved as you go
+  // ---------------------------------------------------------------------------
+  const CHALLENGES = {
+    photo: { text: 'Be photographed by 20 visitors', goal: 20 },
+    drink: { text: 'Drink at three different lakes', goal: 3 },
+    jeep: { text: 'Chase a fleeing tour jeep for 6 seconds', goal: 6, fmt: v => v.toFixed(1) + ' s' },
+    fish: { text: 'Catch 3 fish (Spinosaurus or Quetzalcoatlus)', goal: 3 },
+    kills: { text: 'Bring down 3 animals', goal: 3 },
+    trike: { text: 'Bring down an adult Triceratops', goal: 1 },
+    stampede: { text: 'Start a stampede of 6 or more animals', goal: 1 },
+    show: { text: 'Put on a 400-point show at a viewing deck', goal: 400 },
+    grow: { text: 'Grow up a stage', goal: 1 },
+    scavenge: { text: "Steal a meal from another predator's kill", goal: 1 },
+    critters: { text: 'Snap up 5 small critters', goal: 5 },
+    escape: { text: 'Escape a predator that is hunting you', goal: 1 },
+    swoop: { text: 'Snatch a critter in flight (Quetzalcoatlus)', goal: 1 },
+    charge: { text: 'Survive a Triceratops charge', goal: 1 },
+  };
+  const chal = (function () {
+    const d = new Date(), key = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    let st = store.get('challenges', null);
+    if (!st || st.date !== key || !Array.isArray(st.ids)) {
+      let seed = 7; for (const ch of key) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+      const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
+      const ids = Object.keys(CHALLENGES), pickIds = [];
+      while (pickIds.length < 4) {
+        const id = ids[Math.floor(rnd() * ids.length)];
+        if (pickIds.includes(id) || ((id === 'fish' || id === 'swoop') && (pickIds.includes('fish') || pickIds.includes('swoop')))) continue;
+        pickIds.push(id);
+      }
+      st = { date: key, ids: pickIds, prog: {}, done: {}, drank: [] };
+      store.set('challenges', st);
+    }
+    st.dirty = true;
+    return st;
+  })();
+  function challenge(id, v, mode) {
+    if (!chal.ids.includes(id) || chal.done[id]) return;
+    const c = CHALLENGES[id], cur = chal.prog[id] || 0, nv = mode === 'max' ? Math.max(cur, v) : cur + v;
+    if (nv === cur) return;
+    chal.prog[id] = nv; chal.dirty = true;
+    if (nv >= c.goal) {
+      chal.done[id] = true; toast('Challenge complete: ' + c.text); Sound.chime();
+      if (chal.ids.every(i => chal.done[i])) setTimeout(() => toast("All of today's challenges done!"), 2800);
+    }
+    chal.saveT = 1.5;
+  }
+  const chalEl = document.getElementById('chal');
+  function renderChallenges(dt) {
+    if (chal.saveT > 0 && (chal.saveT -= dt) <= 0) { const { dirty, saveT, ...save } = chal; store.set('challenges', save); }
+    if (!chal.dirty) return; chal.dirty = false;
+    let html = "<h4><span>Today's challenges</span><span>C</span></h4>";
+    for (const id of chal.ids) {
+      const c = CHALLENGES[id], v = Math.min(chal.prog[id] || 0, c.goal), done = !!chal.done[id];
+      const prog = c.goal > 1 ? (c.fmt ? c.fmt(v) : Math.floor(v)) + ' / ' + (c.fmt ? c.fmt(c.goal) : c.goal) : '';
+      html += '<div class="c' + (done ? ' done' : '') + '"><span class="tick">' + (done ? '&#10003;' : '&#9675;') + '</span><span>' + c.text + '</span><span class="p">' + (done ? '' : prog) + '</span></div>';
+    }
+    chalEl.innerHTML = html;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Messages: a gold toast for achievements, a small note for everything else
+  // ---------------------------------------------------------------------------
+  const toastEl = document.getElementById('toast'), noteEl = document.getElementById('note'), fadeEl = document.getElementById('fade');
+  const toasts = []; let toastT = 0, noteT = 0;
+  function toast(text) { toasts.push(text); }
+  function note(text) { noteEl.textContent = text; noteEl.style.opacity = 1; noteT = 2.4; }
+  function updateMessages(dt) {
+    if (toastT > 0) { toastT -= dt; if (toastT <= 0) toastEl.style.opacity = 0; }
+    else if (toasts.length) { toastEl.textContent = toasts.shift(); toastEl.style.opacity = 1; toastT = 2.6; }
+    if (noteT > 0 && (noteT -= dt) <= 0) noteEl.style.opacity = 0;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Glue: voices and footfalls for the animation, migrating herds, buttons
+  // ---------------------------------------------------------------------------
+  function voiceOf(d) {
+    const sp = SPECIES[d.base]; if (!sp || !sp.voice || sp.voice === 'none') return;
+    const mass = d === player.dino ? playerMass() : d.mass;
+    const pitch = clamp(Math.pow(sp.mass / Math.max(mass, 1e-4), 0.22), 1, 3.2), vol = clamp(Math.cbrt(mass / 8) * 1.2, 0.25, 1.4) * (d === player.dino ? 1.3 : 1);
+    const m = mouthOf(d);
+    Sound.voice(sp.voice, { x: m.x, y: (d.groundY || 0) + d.box.y * 0.7, z: m.z }, pitch, vol);
+  }
+  function footfall(d) {
+    const mass = d === player.dino ? playerMass() : d.mass;
+    Sound.step({ x: d.x, y: d.groundY || 0, z: d.z }, mass);
+    if (mass > 4) { const cd = Math.hypot(camera.position.x - d.x, camera.position.z - d.z); if (cd < 40) shake = Math.max(shake, Math.min(0.22, mass / 180) * (1 - cd / 40)); }   // the ground shakes under a sauropod
+  }
+  // every few minutes a herd sets off for another lake
+  function migrate(d) {
+    d.migrateT = rand(200, 450);
+    const L = LAKES[Math.floor(Math.random() * LAKES.length)];
+    for (let i = 0; i < 25; i++) {
+      const a = rand(0, TAU), r = L.r + rand(25, 70), x = clamp(L.x + Math.cos(a) * r, -560, 560), z = clamp(L.z + Math.sin(a) * r, -560, 560), h = terrainH(x, z);
+      if (h >= d.minH + 0.4 && h < 25 && !nearViewpoint(x, z, 8)) { d.home = { x, z }; d.target = { x, z }; d.state = 'walk'; return; }
+    }
+  }
+  const roarBtn = document.getElementById('roarbtn');
+  roarBtn.addEventListener('pointerdown', e => { P.roarReq = true; e.preventDefault(); e.stopPropagation(); });
+  function toggleChal() { chalEl.classList.toggle('hide'); }
+  if (isTouch) chalEl.classList.add('hide');
+  document.getElementById('chalbtn').addEventListener('click', toggleChal);
+  const muteBtn = document.getElementById('mutebtn');
+  function toggleMute() { Sound.init(); muteBtn.textContent = 'Sound: ' + (Sound.toggle() ? 'off' : 'on'); }
+  muteBtn.textContent = 'Sound: ' + (Sound.muted() ? 'off' : 'on');
+  muteBtn.addEventListener('click', toggleMute);
+  const lifeBtns = selectEl.querySelectorAll('.life button');
+  function setLife(mode) { life.mode = mode; store.set('life', mode); for (const b of lifeBtns) b.classList.toggle('on', b.dataset.life === mode); applyGrowth(); }
+  for (const b of lifeBtns) b.addEventListener('click', e => { setLife(b.dataset.life); e.stopPropagation(); });
+  setLife(life.mode);
+
+  // ---------------------------------------------------------------------------
   // HUD
   // ---------------------------------------------------------------------------
   const altEl = document.getElementById('alt'), spdEl = document.getElementById('spd'), nearEl = document.getElementById('near');
-  let hudTimer = 0;
+  const hpFill = document.getElementById('hpFill'), foodFill = document.getElementById('foodFill'), stamFill = document.getElementById('stamFill');
+  const hpBar = document.getElementById('hpBar'), foodBar = document.getElementById('foodBar'), stamBar = document.getElementById('stamBar'), stageEl = document.getElementById('stage');
+  let hudTimer = 0, lastFilter = '';
+  function preyState(d) { return d.defend > 0 ? 'standing its ground' : d.flee > 0 ? 'fleeing' : d.aware >= 0.7 ? 'alarmed' : d.aware > 0.35 ? 'suspicious' : 'unaware'; }
   function updateHUD(dt) {
+    updateMessages(dt);
     if (alertTimer > 0) { alertTimer -= dt; if (alertTimer <= 0) alertEl.style.opacity = 0; }
     if (flashTimer > 0) { flashTimer -= dt; if (flashTimer <= 0) flashEl.style.boxShadow = 'inset 0 0 160px rgba(210,40,25,0)'; }
     hudTimer -= dt; if (hudTimer > 0) return; hudTimer = 0.15;
+    renderChallenges(0.15);
+    // vitals; the world drains of colour as you starve, and the edges pulse red when badly hurt
+    const g = growthOf(player.kind);
+    stageEl.textContent = player.kind === 'quetz' || life.mode === 'adult' ? 'Adult' : STAGES[stageOf(g)][1] + (g < 1 ? ' \u00b7 ' + Math.round(g * 100) + '% grown' : '');
+    hpFill.style.width = life.health.toFixed(1) + '%'; foodFill.style.width = life.hunger.toFixed(1) + '%'; stamFill.style.width = life.stamina.toFixed(1) + '%';
+    hpBar.classList.toggle('low', life.health < 30); foodBar.classList.toggle('low', life.hunger < 20); stamBar.classList.toggle('low', life.exhausted || life.tranqT > 0);
+    const sat = life.hunger < 25 ? lerp(0.15, 1, life.hunger / 25) : 1, filt = sat < 0.99 ? 'saturate(' + sat.toFixed(2) + ')' : '';
+    if (filt !== lastFilter) { renderer.domElement.style.filter = filt; lastFilter = filt; }
+    if (flashTimer <= 0) flashEl.style.boxShadow = !life.dead && life.health < 35 ? 'inset 0 0 ' + Math.round(130 + 50 * Math.sin(elapsed * 7)) + 'px rgba(160,15,10,' + (0.2 + 0.4 * (1 - life.health / 35)).toFixed(2) + ')' : 'inset 0 0 160px rgba(210,40,25,0)';
+
     const gh = Math.max(terrainH(P.x, P.z), WATER_Y);
     altEl.textContent = Math.round(P.y - gh);
     spdEl.textContent = Math.round(P.speed * 3.6);
     let best = null, bd = 1e9, hunter = null;
-    for (const d of dinos) { const dd = Math.hypot(d.x - P.x, d.z - P.z); if (dd < bd) { bd = dd; best = d; } if (d.hunt > 0 && (!hunter || dd < hunter.dd)) hunter = { d, dd }; }
+    for (const d of dinos) { if (d.gone) continue; const dd = Math.hypot(d.x - P.x, d.z - P.z); if (dd < bd) { bd = dd; best = d; } if (d.hunt > 0 && !d.dead && (!hunter || dd < hunter.dd)) hunter = { d, dd }; }
     let bestF = null, bf = 1e9;
     for (const m of flyers) { const dd = Math.hypot(m.x - P.x, m.y - P.y, m.z - P.z); if (dd < bf) { bf = dd; bestF = m; } }
     const lines = [], onGround = player.kind !== 'quetz';
-    let jd = 1e9; for (const j of jeeps) jd = Math.min(jd, Math.hypot(j.x - P.x, j.z - P.z));
+    let jd = 1e9, jn = null; for (const j of jeeps) { const dd = Math.hypot(j.x - P.x, j.z - P.z); if (dd < jd) { jd = dd; jn = j; } }
     let vp = null, vd = 1e9; for (const v of VIEWPOINTS) { const dd = Math.hypot(v.x - P.x, v.z - P.z); if (dd < vd) { vd = dd; vp = v; } }
     const bdist = Math.hypot(balloon.group.position.x - P.x, balloon.group.position.y - P.y, balloon.group.position.z - P.z);
     if (hunter) lines.push('<span style="color:#ffb3a0">&#9888; ' + hunter.d.name + ' is hunting you</span>');
-    else if (vd < 50 && vd < bd + 15) lines.push((onGround ? 'Nearby: ' : 'Below: ') + vp.name + ' (' + vp.people.length + ' visitors)');
-    else if (jd < 45 && jd < bd) lines.push((onGround ? 'Nearby: ' : 'Below: ') + 'Tour jeep');
-    else if (best && bd < (onGround ? 60 : 90)) lines.push((onGround ? 'Nearby: ' : 'Below: ') + best.name);
+    else if (ranger.alertT > 0 && Math.hypot(ranger.x - P.x, ranger.z - P.z) < 220) lines.push('<span style="color:#ffd88a">&#9888; Park rangers are tracking you</span>');
+    if (vd < 50 && vd < bd + 15) lines.push((onGround ? 'Nearby: ' : 'Below: ') + vp.name + ' (' + vp.people.length + ' visitors' + (vp.panicking ? ', panicking' : '') + ')');
+    else if (jd < 45 && jd < bd) lines.push((onGround ? 'Nearby: ' : 'Below: ') + (jn.ranger ? 'Ranger jeep' : 'Tour jeep'));
+    else if (best && bd < (onGround ? 60 : 90)) lines.push((onGround ? 'Nearby: ' : 'Below: ') + best.name + (best.dead ? ' carcass' : onGround && !best.carnivore && best.role !== 'swim' ? ' \u00b7 ' + preyState(best) : ''));
     if (bdist < 80) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + 'Hot air balloon');
     else if (bestF && bf < 70) lines.push((onGround ? 'Overhead: ' : 'Alongside: ') + bestF.model.name);
+    for (const v of VIEWPOINTS) if (v.show >= 1 && Math.hypot(v.x - P.x, v.z - P.z) < 220) lines.push('<span style="color:#ffe9a8">&#9733; Show at ' + v.name + ': ' + Math.round(v.show) + '</span>');
     nearEl.innerHTML = lines.join('<br>');
   }
 
@@ -2796,11 +4038,16 @@
     fpsCount++; fpsTime += raw; if (fpsTime >= 1) { fps = fpsCount / fpsTime; fpsCount = 0; fpsTime = 0; window.__game && (window.__game.fps = fps); }
 
     if (player.kind === 'quetz') updatePlayer(dt); else updateGroundPlayer(dt, elapsed);
+    updateSurvival(dt);
     for (const d of dinos) updateDino(d, dt, elapsed);
+    updateFlockTargets(dt);
     updateFlyers(dt, elapsed);
     updateJeeps(dt);
     updateBalloon(dt, elapsed);
     updateViewpoints(dt, elapsed);
+    updateShows(dt);
+    updateCritters(dt, elapsed); updateFish(dt); updateCarried(dt, elapsed);
+    stepFx(sparks, dt); stepFx(dustFx, dt); stepRipples(dt);
 
     for (const c of clouds) { c.position.x += c.userData.speed * dt; if (c.position.x > HALF * 1.4) c.position.x = -HALF * 1.4; }
     waterNormal.offset.x += dt * 0.012; waterNormal.offset.y += dt * 0.008;
@@ -2812,6 +4059,7 @@
     sky.position.copy(camera.position);
 
     updateHUD(dt);
+    Sound.update(dt);
     renderer.render(scene, camera);
   }
 
@@ -2824,7 +4072,8 @@
   document.getElementById('loading').style.display = 'none';
   selectCharacter('quetz');
   showSelect(true);
-  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter, jeeps, balloon, VIEWPOINTS };
+  window.__game = { P, dinos, flyers, LAKES, terrainH, quetz, camera, scene, touch, renderer, player, selectCharacter, jeeps, balloon, VIEWPOINTS,
+    life, critters, fishes, Sound, chal, CHALLENGES, killDino, damageDino, ranger, playerMass, growthOf, applyGrowth, setLife, flocks, bodyDist, mouthOf };
   frame();
 })();
 </script>
