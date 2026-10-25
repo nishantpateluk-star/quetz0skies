@@ -17,6 +17,7 @@
   #stats { position: absolute; right: 16px; top: 14px; color: #fff; font-size: 14px; text-align: right; text-shadow: 0 1px 3px rgba(0,0,0,.6); background: rgba(0,0,0,.25); padding: 8px 12px; border-radius: 8px; line-height: 1.6; pointer-events: none; }
   #alert { position: absolute; left: 50%; top: 16%; transform: translateX(-50%); color: #fff; font-size: 26px; font-weight: 700; text-shadow: 0 2px 8px rgba(0,0,0,.8), 0 0 18px rgba(255,80,40,.6); opacity: 0; transition: opacity .25s; pointer-events: none; white-space: nowrap; }
   #vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 55%, rgba(10,14,20,.28) 100%); }
+  #grey { position: absolute; inset: 0; pointer-events: none; }
   #flash { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 140px rgba(210,40,25,0); transition: box-shadow .18s; }
   #dpad { position: absolute; right: 26px; bottom: 26px; width: 176px; height: 176px; border-radius: 50%; display: none; touch-action: none;
           background: radial-gradient(circle, rgba(255,255,255,.28) 0%, rgba(255,255,255,.14) 68%, rgba(255,255,255,0) 70%); box-shadow: 0 0 0 2px rgba(255,255,255,.25) inset; }
@@ -80,6 +81,7 @@
 <div id="loading">Growing the Cretaceous&hellip;</div>
 <div id="err"></div>
 <div id="vignette"></div>
+<div id="grey"></div>
 <div id="flash"></div>
 <div id="hud">
   <h1 id="title">Quetzalcoatlus</h1>
@@ -2947,13 +2949,13 @@
       if (life.stamina < 4) note('Too tired');
       else {
         d.lungeT = 1.0; d.lungeCd = player.kind === 'raptor' ? 0.7 : 0.9; d.snapped = false;
-        life.stamina -= player.kind === 'raptor' ? 12 : 6;
+        life.stamina -= (player.kind === 'raptor' ? 12 : 6) * staminaUse();
         if (player.kind === 'raptor') life.pounceT = 0.45;
       }
     }
     if (roarReq && d.roarT <= 0 && !life.latched) {
       if (life.stamina < 20) note('Too tired to roar');
-      else { life.stamina -= 20; d.roarT = 1.6; scareHerds(cfg.scare * (0.4 + 0.6 * g)); cheerViewpoints(); shake = Math.max(shake, 0.5 * g); }
+      else { life.stamina -= 20 * staminaUse(); d.roarT = 1.6; scareHerds(cfg.scare * (0.4 + 0.6 * g)); cheerViewpoints(); shake = Math.max(shake, 0.5 * g); }
     }
     // a pouncing raptor bites the moment it reaches something, rather than overshooting it
     if (life.pounceT > 0 && d.lungeT > 0 && !d.snapped) {
@@ -3382,6 +3384,7 @@
     d.group.scale.setScalar(g); d.stride = d.baseStride / g;
     d.box = { x: b.x * g, z0: b.z0 * g, z1: b.z1 * g, y: b.y * g };
   }
+  const staminaUse = () => player.kind === 'raptor' ? 0.5 : 1;   // the raptor has twice the stamina of the others
   function runSpeed() {
     const cfg = CHAR[player.kind], g = growthOf(player.kind);
     return cfg.run * (0.62 + 0.38 * g) * (life.exhausted ? 0.55 : 1) * (life.tranqT > 0 ? 0.6 : 1);
@@ -3423,7 +3426,7 @@
     const young = player.kind !== 'quetz' && growthOf(player.kind) < 0.97;
     const drain = (player.kind === 'quetz' ? 0.2 : 0.28) * (young ? 1.2 : 1) + 0.3 * life.exert;
     life.hunger = Math.max(0, life.hunger - drain * dt);
-    if (life.exert > 0.5) life.stamina -= 11 * life.exert * dt;
+    if (life.exert > 0.5) life.stamina -= 11 * life.exert * staminaUse() * dt;
     else life.stamina += (life.hunger > 15 ? 13 : 5) * (life.drinking ? 3 : 1) * dt;
     life.stamina = clamp(life.stamina, 0, 100);
     if (life.stamina <= 0) life.exhausted = true; else if (life.exhausted && life.stamina > 35) life.exhausted = false;
@@ -3987,6 +3990,7 @@
   const hpFill = document.getElementById('hpFill'), foodFill = document.getElementById('foodFill'), stamFill = document.getElementById('stamFill');
   const hpBar = document.getElementById('hpBar'), foodBar = document.getElementById('foodBar'), stamBar = document.getElementById('stamBar'), stageEl = document.getElementById('stage');
   let hudTimer = 0, lastFilter = '';
+  const greyEl = document.getElementById('grey');
   function preyState(d) { return d.defend > 0 ? 'standing its ground' : d.flee > 0 ? 'fleeing' : d.aware >= 0.7 ? 'alarmed' : d.aware > 0.35 ? 'suspicious' : 'unaware'; }
   function updateHUD(dt) {
     updateMessages(dt);
@@ -4000,7 +4004,7 @@
     hpFill.style.width = life.health.toFixed(1) + '%'; foodFill.style.width = life.hunger.toFixed(1) + '%'; stamFill.style.width = life.stamina.toFixed(1) + '%';
     hpBar.classList.toggle('low', life.health < 30); foodBar.classList.toggle('low', life.hunger < 20); stamBar.classList.toggle('low', life.exhausted || life.tranqT > 0);
     const sat = life.hunger < 25 ? lerp(0.15, 1, life.hunger / 25) : 1, filt = sat < 0.99 ? 'saturate(' + sat.toFixed(2) + ')' : '';
-    if (filt !== lastFilter) { renderer.domElement.style.filter = filt; lastFilter = filt; }
+    if (filt !== lastFilter) { greyEl.style.backdropFilter = greyEl.style.webkitBackdropFilter = filt; lastFilter = filt; }   // an overlay under the HUD: a filter on the canvas itself would lift it above the HUD
     if (flashTimer <= 0) flashEl.style.boxShadow = !life.dead && life.health < 35 ? 'inset 0 0 ' + Math.round(130 + 50 * Math.sin(elapsed * 7)) + 'px rgba(160,15,10,' + (0.2 + 0.4 * (1 - life.health / 35)).toFixed(2) + ')' : 'inset 0 0 160px rgba(210,40,25,0)';
 
     const gh = Math.max(terrainH(P.x, P.z), WATER_Y);
